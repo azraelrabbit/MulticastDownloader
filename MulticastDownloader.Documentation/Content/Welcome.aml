@@ -1,0 +1,27 @@
+<topic id="d9f9e696-b1a3-44f4-b52c-b332d24264e1" revisionNumber="1">
+  <developerConceptualDocument
+    xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+
+    <introduction>
+      <para>
+        MulticastDownloader is a .NET-based library permitting IPV6 multicast/IPV4 broadcast based file transfers over a network, and optionally supporting IGMP multicast. 
+        See the wiki for further documentation.
+      </para>
+    </introduction>
+
+    <relatedTopics>
+      <externalLink>
+        <linkText>MulticastDownloader on GitHub</linkText>
+        <linkAlternateText>MulticastDownloader on GitHub</linkAlternateText>
+        <linkUri>https://github.com/daparker3/MulticastDownloader</linkUri>
+      </externalLink>
+
+      <externalLink>
+        <linkText>ProtoBuf-Net</linkText>
+        <linkAlternateText>ProtoBuf-Net</linkAlternateText>
+        <linkUri>https://github.com/mgravell/protobuf-net</linkUri>
+      </externalLink>
+    </relatedTopics>
+  </developerConceptualDocument>
+</topic>

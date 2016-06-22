@@ -1,0 +1,19 @@
+﻿{
+  "supports": {
+    "net46.app": {},
+    "uwp.10.0.app": {}
+  },
+  "dependencies": {
+    "EWSoftware.SHFB.NETPortable": "4.6.0",
+    "Microsoft.NETCore": "5.0.0",
+    "Microsoft.NETCore.Portable.Compatibility": "1.0.0",
+    "MsBuild.NuGet.Pack": "2.0.0",
+    "protobuf-net": "2.0.0.668",
+    "StyleCop.Analyzers": "1.0.0"
+  },
+  "frameworks": {
+    "dotnet": {
+      "imports": "portable-net452+win81"
+    }
+  }
+}
