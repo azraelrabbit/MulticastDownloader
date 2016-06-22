@@ -4,8 +4,6 @@
       <AnalyzerSettings>
         <BooleanProperty Name="IgnorePrivates">True</BooleanProperty>
         <BooleanProperty Name="IgnoreInternals">True</BooleanProperty>
-        <StringProperty Name="CompanyName">MS</StringProperty>
-        <StringProperty Name="Copyright">Copyright (c) 2016 MS</StringProperty>
       </AnalyzerSettings>
     </Analyzer>
   </Analyzers>

@@ -7,7 +7,7 @@
 namespace MS.MulticastDownloader.Core.Server
 {
     /// <summary>
-    /// Class1.
+    /// Class1 class one.
     /// </summary>
     public class Class1
     {
