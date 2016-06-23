@@ -5,6 +5,7 @@
 //-----------------------------------------------------------------------
 
 using System.Reflection;
+using System.Runtime.CompilerServices;
 
 [assembly: AssemblyTitle("MS.MulticastDownloader.Core.Server")]
 [assembly: AssemblyDescription("Server Functionality for MS Multicast Downloader")]
@@ -14,3 +15,6 @@ using System.Reflection;
 [assembly: AssemblyCulture("en")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: InternalsVisibleTo("MS.MulticastDownloader.Core")]
+[assembly: InternalsVisibleTo("MS.MulticastDownloader.Commands")]
+[assembly: InternalsVisibleTo("MS.MulticastDownloader.Tests")]

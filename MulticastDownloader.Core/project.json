@@ -5,6 +5,7 @@
   },
   "dependencies": {
     "Common.Logging.Portable": "3.3.1",
+    "Ensure.That": "4.0.0",
     "EWSoftware.SHFB.NETPortable": "4.6.0",
     "Microsoft.NETCore": "5.0.0",
     "Microsoft.NETCore.Portable.Compatibility": "1.0.0",
