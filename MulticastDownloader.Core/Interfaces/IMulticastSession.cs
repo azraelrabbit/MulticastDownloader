@@ -1,15 +1,15 @@
 ﻿//-----------------------------------------------------------------------
-// <copyright file="Class1.cs" company="MS">
+// <copyright file="IMulticastSession.cs" company="MS">
 //     Copyright (c) 2016 MS.
 // </copyright>
 //-----------------------------------------------------------------------
 
-namespace MS.MulticastDownloader.Commands
+namespace MS.MulticastDownloader.Core.Interfaces
 {
     /// <summary>
-    /// Class1 class one.
+    /// An interface representing a multicast session server.
     /// </summary>
-    public class Class1
+    public class IMulticastSession
     {
     }
 }

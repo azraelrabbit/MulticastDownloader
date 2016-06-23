@@ -44,11 +44,15 @@
     <None Include="MulticastDownloader.core.nuspec" />
     <None Include="MulticastDownloader.Core.ruleset" />
     <None Include="project.json" />
-    <None Include="stylecop.json" />
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <AdditionalFiles Include="stylecop.json" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="Interfaces\IMulticastSession.cs" />
+    <Compile Include="Interfaces\NamespaceDoc.cs" />
     <Compile Include="NamespaceDoc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
