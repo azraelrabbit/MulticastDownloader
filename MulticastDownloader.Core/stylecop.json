@@ -5,7 +5,8 @@
       "companyName": "MS",
       "copyrightText": "Copyright (c) 2016 MS.",
       "documentInternalElements": false,
-      "documentPrivateElements": false
+      "documentPrivateElements": false,
+      "documentPrivateFields": false
     }
   }
 }

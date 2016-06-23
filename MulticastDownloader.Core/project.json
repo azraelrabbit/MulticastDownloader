@@ -1,21 +1,16 @@
-﻿{
-  "supports": {
-    "net46.app": {},
-    "uwp.10.0.app": {}
-  },
+{
+  "supports": { },
   "dependencies": {
-    "Common.Logging.Portable": "3.3.1",
     "Ensure.That": "4.0.0",
     "EWSoftware.SHFB.NETPortable": "4.6.0",
-    "Microsoft.NETCore": "5.0.0",
-    "Microsoft.NETCore.Portable.Compatibility": "1.0.0",
     "MsBuild.NuGet.Pack": "2.0.0",
+    "Portable.BouncyCastle": "1.8.1",
     "protobuf-net": "2.0.0.668",
-    "StyleCop.Analyzers": "1.0.0"
+    "StyleCop.Analyzers": "1.0.0",
+    "Common.Logging.Core": "3.3.1"
   },
   "frameworks": {
-    "dotnet": {
-      "imports": "portable-net452+win81"
-    }
-  }
+    ".NETPortable,Version=v4.6,Profile=Profile44": { }
+  },
+  "runtimes": { "win": { } }
 }

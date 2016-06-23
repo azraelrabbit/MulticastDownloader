@@ -6,6 +6,8 @@
 
 namespace MS.MulticastDownloader.Commands
 {
+    using System.Management.Automation;
+
     /// <summary>
     /// Class1 class one.
     /// </summary>
