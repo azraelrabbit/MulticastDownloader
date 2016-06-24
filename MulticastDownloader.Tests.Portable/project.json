@@ -1,15 +1,17 @@
-{
+﻿{
   "supports": {},
   "dependencies": {
     "Common.Logging.Core": "3.3.1",
     "Common.Logging.Portable": "3.3.1",
+    "PCLStorage": "1.0.2",
     "StyleCop.Analyzers": "1.0.0",
     "xunit": "2.1.0",
-    "xunit.abstractions": "2.0.0",
-    "xunit.runner.visualstudio": "2.1.0"
+    "xunit.abstractions": "2.0.0"
   },
   "frameworks": {
-    ".NETPortable,Version=v4.6,Profile=Profile44": { }
+    ".NETPortable,Version=v4.6,Profile=Profile44": {}
   },
-  "runtimes": { "win" : { } }
+  "runtimes": {
+    "win": {}
+  }
 }

@@ -7,6 +7,8 @@ namespace MS.MulticastDownloader.Core.Cryptography
     using System;
     using System.Text;
     using EnsureThat;
+    using Org.BouncyCastle.Crypto;
+    using Org.BouncyCastle.Crypto.Parameters;
 
     /// <summary>
     /// Represent a passphrase-based secret.
@@ -31,23 +33,23 @@ namespace MS.MulticastDownloader.Core.Cryptography
         }
 
         /// <summary>
-        /// Creates the key.
+        /// Creates the cipher.
         /// </summary>
         /// <param name="desiredLength">Length of the desired.</param>
         /// <returns>
-        /// A key.
+        /// A cipher with the desired block length.
         /// </returns>
-        public byte[] CreateKey(int desiredLength)
+        public ICipherParameters CreateCipher(int desiredLength)
         {
             byte[] encoded = this.enc.GetBytes(this.passPhrase);
             if (encoded.Length < desiredLength)
             {
                 byte[] ret = new byte[desiredLength];
                 Buffer.BlockCopy(encoded, 0, ret, 0, encoded.Length);
-                return ret;
+                return new KeyParameter(ret);
             }
 
-            return encoded;
+            return new KeyParameter(encoded);
         }
     }
 }

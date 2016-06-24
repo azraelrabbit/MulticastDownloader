@@ -1,19 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.props" Condition="Exists('..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.props')" />
+  <Import Project="..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props" Condition="Exists('..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <RunNuGetPack>true</RunNuGetPack>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{4D17ABD7-F7D7-4E04-8156-A02A04C9E8B8}</ProjectGuid>
+    <ProjectGuid>{905E87EB-DF8F-43EA-A005-7631E26825BD}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MS.MulticastDownloader.Commands</RootNamespace>
-    <AssemblyName>MS.MulticastDownloader.Commands</AssemblyName>
+    <RootNamespace>MS.MulticastDownloader.Tests</RootNamespace>
+    <AssemblyName>MS.MulticastDownloader.Tests</AssemblyName>
     <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkProfile />
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <StyleCopTreatErrorsAsWarnings>True</StyleCopTreatErrorsAsWarnings>
@@ -23,11 +21,11 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\MS.MulticastDownloader.Commands.XML</DocumentationFile>
-    <CodeAnalysisRuleSet>MulticastDownloader.Commands.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Debug\MS.MulticastDownloader.Tests.XML</DocumentationFile>
+    <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -36,8 +34,8 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\MS.MulticastDownloader.Commands.XML</DocumentationFile>
-    <CodeAnalysisRuleSet>MulticastDownloader.Commands.ruleset</CodeAnalysisRuleSet>
+    <DocumentationFile>bin\Release\MS.MulticastDownloader.Tests.XML</DocumentationFile>
+    <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Common.Logging.Core, Version=3.3.1.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
@@ -50,6 +48,10 @@
     </Reference>
     <Reference Include="crypto, Version=1.8.1.0, Culture=neutral, PublicKeyToken=0e99375e54769942, processorArchitecture=MSIL">
       <HintPath>..\packages\Portable.BouncyCastle.1.8.1\lib\net46\crypto.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="EnsureThat.vNext, Version=4.0.0.26, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Ensure.That.4.0.0\lib\net46\EnsureThat.vNext.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="PCLStorage, Version=1.0.2.0, Culture=neutral, PublicKeyToken=286fe515a2c35b64, processorArchitecture=MSIL">
@@ -90,24 +92,39 @@
       <HintPath>..\packages\System.IO.FileSystem.Primitives.4.0.0\lib\net46\System.IO.FileSystem.Primitives.dll</HintPath>
       <Private>True</Private>
     </Reference>
-    <Reference Include="System.Management" />
-    <Reference Include="System.Management.Automation, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.PowerShell.5.ReferenceAssemblies.1.0.0\lib\net4\System.Management.Automation.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
+    <Reference Include="xunit.abstractions, Version=2.0.0.0, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.abstractions.2.0.0\lib\net35\xunit.abstractions.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.assert, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.assert.2.1.0\lib\dotnet\xunit.assert.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.core, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.core.2.1.0\lib\dotnet\xunit.core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="xunit.execution.desktop, Version=2.1.0.3179, Culture=neutral, PublicKeyToken=8d05b1bb7a6fdb6c, processorArchitecture=MSIL">
+      <HintPath>..\packages\xunit.extensibility.execution.2.1.0\lib\net45\xunit.execution.desktop.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
-    <Compile Include="NamespaceDoc.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="..\MulticastDownloader.Tests.Portable\**\*.cs">
+      <Link>%(RecursiveDir)\%(Filename)%(Extension)</Link>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MulticastDownloader.Commands\MulticastDownloader.Commands.csproj">
+      <Project>{4d17abd7-f7d7-4e04-8156-a02a04c9e8b8}</Project>
+      <Name>MulticastDownloader.Commands</Name>
+    </ProjectReference>
     <ProjectReference Include="..\MulticastDownloader.Core.Server\MulticastDownloader.Core.Server.csproj">
       <Project>{9daff580-78ce-4257-8c23-23824d945fff}</Project>
       <Name>MulticastDownloader.Core.Server</Name>
@@ -118,25 +135,33 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MulticastDownloader.Commands.nuspec" />
-    <None Include="MulticastDownloader.Commands.ruleset" />
+    <Content Include="..\MulticastDownloader.Tests.Portable\TestKey.cer">
+      <Link>TestKey.cer</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\MulticastDownloader.Tests.Portable\TestKeyPrivate.der">
+      <Link>TestKeyPrivate.der</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="..\MulticastDownloader.Tests.Portable\xunit.runner.json">
+      <Link>xunit.runner.json</Link>
+    </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Util\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.props'))" />
-    <Error Condition="!Exists('..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.targets'))" />
+    <Error Condition="!Exists('..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\xunit.runner.visualstudio.2.1.0\build\net20\xunit.runner.visualstudio.props'))" />
   </Target>
-  <Import Project="..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.targets" Condition="Exists('..\packages\XmlDoc2CmdletDoc.0.2.3\build\XmlDoc2CmdletDoc.targets')" />
   <Import Project="$(ProgramFiles)\MSBuild\StyleCop\v4.7\StyleCop.targets" />
-  <Import Project="..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets" Condition="Exists('..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets')" />
-  <Target Name="EnsureMsBuildNuGetPackImported" BeforeTargets="BeforeBuild" Condition="'$(MsBuildNuGetPackImported)' == ''">
-    <Error Condition="!Exists('..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets') And ('$(RunNuGetPack)' != '' And $(RunNuGetPack))" Text="You are trying to build with MsBuild.NuGet.Pack, but the MsBuild.NuGet.Pack.targets file is not available on this computer. This is probably because the MsBuild.NuGet.Pack package has not been committed to source control, or NuGet Package Restore is not enabled. Please enable NuGet Package Restore to download them. For more information, see http://go.microsoft.com/fwlink/?LinkID=317567." HelpKeyword="BCLBUILD2001" />
-    <Error Condition="Exists('..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets') And ('$(RunNuGetPack)' != '' And $(RunNuGetPack))" Text="MsBuild.NuGet.Pack cannot be run because NuGet packages were restored prior to the build running, and the targets file was unavailable when the build started. Please build the project again to include these packages in the build. You may also need to make sure that your build server does not delete packages prior to each build. For more information, see http://go.microsoft.com/fwlink/?LinkID=317568." HelpKeyword="BCLBUILD2002" />
-  </Target>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

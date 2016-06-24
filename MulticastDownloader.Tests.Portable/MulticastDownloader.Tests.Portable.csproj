@@ -7,11 +7,11 @@
     <MinimumVisualStudioVersion>12.0</MinimumVisualStudioVersion>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{24C2EA18-72B6-49DC-A1DD-1D64856B889F}</ProjectGuid>
+    <ProjectGuid>{9CD1DEF8-2A00-4265-B2AA-D656A873BD41}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>MS.MulticastDownloader.Core.Tests</RootNamespace>
-    <AssemblyName>MS.MulticastDownloader.Core.Tests</AssemblyName>
+    <RootNamespace>MS.MulticastDownloader.Tests</RootNamespace>
+    <AssemblyName>MS.MulticastDownloader.Tests</AssemblyName>
     <DefaultLanguage>en-US</DefaultLanguage>
     <FileAlignment>512</FileAlignment>
     <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
@@ -26,7 +26,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Debug\MS.MulticastDownloader.Core.Tests.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\MS.MulticastDownloader.Tests.xml</DocumentationFile>
     <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -36,7 +36,7 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>bin\Release\MS.MulticastDownloader.Core.Tests.XML</DocumentationFile>
+    <DocumentationFile>bin\Release\MS.MulticastDownloader.Tests.xml</DocumentationFile>
     <NoWarn>CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
@@ -45,8 +45,21 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Cryptography\SecretTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Util\Runtime.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="TestKey.cer">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <None Include="TestKey.pvk" />
+    <None Include="TestKeyPrivate.pfx" />
+    <Content Include="TestKeyPrivate.der">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Cryptography\SecretTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="stylecop.json" />

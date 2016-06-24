@@ -49,11 +49,25 @@
     <AdditionalFiles Include="stylecop.json" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cryptography\CertificateFlags.cs" />
     <Compile Include="Cryptography\Encoder.cs" />
     <Compile Include="Cryptography\ISecret.cs" />
+    <Compile Include="Cryptography\NamespaceDoc.cs" />
     <Compile Include="Cryptography\PassphraseSecret.cs" />
+    <Compile Include="Cryptography\CertificateSecret.cs" />
     <Compile Include="NamespaceDoc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <Import Project="..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets" Condition="Exists('..\packages\MsBuild.NuGet.Pack.2.0.0\tools\MsBuild.NuGet.Pack.targets')" />

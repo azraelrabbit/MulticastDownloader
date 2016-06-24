@@ -4,16 +4,18 @@
 
 namespace MS.MulticastDownloader.Core.Cryptography
 {
+    using Org.BouncyCastle.Crypto;
+
     /// <summary>
     /// Represent a cryptographic secret.
     /// </summary>
     public interface ISecret
     {
         /// <summary>
-        /// Creates the key.
+        /// Creates the cipher.
         /// </summary>
         /// <param name="desiredLength">Length of the desired.</param>
-        /// <returns>A key.</returns>
-        byte[] CreateKey(int desiredLength);
+        /// <returns>A cipher with the desired block length.</returns>
+        ICipherParameters CreateCipher(int desiredLength);
     }
 }
