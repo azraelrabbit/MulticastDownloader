@@ -1,4 +1,4 @@
-﻿// <copyright file="CertificateFlags.cs" company="MS">
+﻿// <copyright file="AsymmetricSecretFlags.cs" company="MS">
 // Copyright (c) 2016 MS.
 // </copyright>
 
@@ -10,7 +10,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
     /// Represent certificate validation flags.
     /// </summary>
     [Flags]
-    public enum CertificateFlags
+    public enum AsymmetricSecretFlags
     {
         /// <summary>
         /// No certificate flags
@@ -20,11 +20,6 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <summary>
         /// Attempt to use the private key out of the certificate as the secret
         /// </summary>
-        ReadPrivateKey = 0x1,
-
-        /// <summary>
-        /// Validate the certificate
-        /// </summary>
-        Validate = 0x2
+        ReadPrivateKey = 0x1
     }
 }

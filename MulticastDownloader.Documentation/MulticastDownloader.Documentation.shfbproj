@@ -100,7 +100,15 @@
           </ignoreIfUnresolved>
         </configuration>
       </PlugInConfig>
-<PlugInConfig id="Version Builder" enabled="True"><configuration><currentProject label=".Net Portable" version="4.6" ripOldApis="True" /><versions><version label=".Net, Version: 4.6" version="1.0" helpFileProject="..\MulticastDownloader.Commands.Documentation\MulticastDownloader.Commands.Documentation.shfbproj" /></versions></configuration></PlugInConfig></PlugInConfigurations>
+      <PlugInConfig id="Version Builder" enabled="True">
+        <configuration>
+          <currentProject label=".Net Portable" version="4.6" ripOldApis="True" />
+          <versions>
+            <version label=".Net, Version: 4.6" version="1.0" helpFileProject="..\MulticastDownloader.Commands.Documentation\MulticastDownloader.Commands.Documentation.shfbproj" />
+          </versions>
+        </configuration>
+      </PlugInConfig>
+    </PlugInConfigurations>
   </PropertyGroup>
   <!-- There are no properties for these groups.  AnyCPU needs to appear in order for Visual Studio to perform
 			 the build.  The others are optional common platform types that may appear. -->

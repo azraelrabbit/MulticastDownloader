@@ -117,7 +117,16 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="BlockSizeMustBeMultipleOf8" xml:space="preserve">
+    <value>Block size must be multiple of 8.</value>
+  </data>
   <data name="CertificateDoesNotContainPrivateKey" xml:space="preserve">
-    <value>Certificate does not contain a valid public or private key.</value>
+    <value>Certificate does not contain a valid public or private key. Check your asymmetric key flags.</value>
+  </data>
+  <data name="CertificateTypeMismatch" xml:space="preserve">
+    <value>Certificate file type mismatch. Expected a PEM-encoded file containing an RSA key pair.</value>
+  </data>
+  <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
+    <value>String cannot be null or empty.</value>
   </data>
 </root>

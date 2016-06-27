@@ -28,6 +28,7 @@
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>bin\Debug\MS.MulticastDownloader.Tests.xml</DocumentationFile>
     <NoWarn>CS1591</NoWarn>
+    <CodeAnalysisRuleSet>MulticastDownloader.Tests.Portable.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -38,28 +39,18 @@
     <WarningLevel>4</WarningLevel>
     <DocumentationFile>bin\Release\MS.MulticastDownloader.Tests.xml</DocumentationFile>
     <NoWarn>CS1591</NoWarn>
+    <CodeAnalysisRuleSet>MulticastDownloader.Tests.Portable.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="MulticastDownloader.Tests.Portable.ruleset" />
     <None Include="project.json" />
     <None Include="xunit.runner.json" />
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cryptography\EncoderTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Util\Runtime.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="TestKey.cer">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <None Include="TestKey.pvk" />
-    <None Include="TestKeyPrivate.pfx" />
-    <Content Include="TestKeyPrivate.der">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Cryptography\SecretTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="stylecop.json" />

@@ -4,11 +4,11 @@
     "documentationRules": {
       "companyName": "MS",
       "copyrightText": "Copyright (c) 2016 MS.",
-      "documentInterfaces": false,
-      "documentExposedElements": false,
       "documentInternalElements": false,
       "documentPrivateElements": false,
-      "documentPrivateFields": false
+      "documentPrivateFields": false,
+      "documentExposedElements": false,
+      "documentInterfaces": false
     }
   }
 }

@@ -11,5 +11,6 @@ namespace MS.MulticastDownloader.Core.Server
     /// </summary>
     public class Class1
     {
+        private string foo;
     }
 }

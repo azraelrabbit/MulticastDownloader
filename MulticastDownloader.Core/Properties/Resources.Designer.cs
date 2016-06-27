@@ -62,11 +62,38 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Certificate does not contain a valid public or private key..
+        ///   Looks up a localized string similar to Block size must be multiple of 8..
+        /// </summary>
+        internal static string BlockSizeMustBeMultipleOf8 {
+            get {
+                return ResourceManager.GetString("BlockSizeMustBeMultipleOf8", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Certificate does not contain a valid public or private key. Check your asymmetric key flags..
         /// </summary>
         internal static string CertificateDoesNotContainPrivateKey {
             get {
                 return ResourceManager.GetString("CertificateDoesNotContainPrivateKey", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Certificate file type mismatch. Expected a PEM-encoded file containing an RSA key pair..
+        /// </summary>
+        internal static string CertificateTypeMismatch {
+            get {
+                return ResourceManager.GetString("CertificateTypeMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to String cannot be null or empty..
+        /// </summary>
+        internal static string StringCannotBeNullOrEmpty {
+            get {
+                return ResourceManager.GetString("StringCannotBeNullOrEmpty", resourceCulture);
             }
         }
     }
