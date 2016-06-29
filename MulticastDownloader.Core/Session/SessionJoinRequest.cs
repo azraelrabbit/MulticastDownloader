@@ -11,5 +11,8 @@ namespace MS.MulticastDownloader.Core.Session
     {
         [ProtoMember(1)]
         internal string Path { get; set; }
+
+        [ProtoMember(2)]
+        internal byte[] ChallengeResponse { get; set; }
     }
 }

@@ -15,3 +15,5 @@ using System.Runtime.CompilerServices;
 [assembly: AssemblyCulture("")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: InternalsVisibleTo("MS.MulticastDownloader.Core.Server")]
+[assembly: InternalsVisibleTo("MS.MulticastDownloader.Tests")]

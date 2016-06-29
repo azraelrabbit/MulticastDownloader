@@ -11,6 +11,7 @@ namespace MS.MulticastDownloader.Core.Session
         Failed,
         AccessDenied,
         InvalidOperation,
-        PathNotFound
+        PathNotFound,
+        WaveComplete
     }
 }

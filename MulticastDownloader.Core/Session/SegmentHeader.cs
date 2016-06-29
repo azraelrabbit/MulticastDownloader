@@ -13,13 +13,5 @@ namespace MS.MulticastDownloader.Core.Session
         // The file session id
         [ProtoMember(1)]
         internal int SessionId { get; set; }
-
-        // The file range
-        [ProtoMember(2)]
-        internal int WaveId { get; set; }
-
-        // The file block range
-        [ProtoMember(3)]
-        internal long BlockId { get; set; }
     }
 }

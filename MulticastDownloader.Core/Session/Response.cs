@@ -10,6 +10,8 @@ namespace MS.MulticastDownloader.Core.Session
     using ProtoBuf;
 
     [ProtoContract]
+    [ProtoInclude(1, typeof(SessionJoinResponse))]
+    [ProtoInclude(2, typeof(WaveCompleteResponse))]
     internal class Response
     {
         [ProtoMember(1)]
@@ -18,10 +20,20 @@ namespace MS.MulticastDownloader.Core.Session
         [ProtoMember(2)]
         internal string Message { get; set; }
 
+        internal static T CreateFailure<T>(ResponseId responseType, string message)
+            where T : Response, new()
+        {
+            T ret = new T();
+            ret.ResponseType = responseType;
+            ret.Message = message;
+            return ret;
+        }
+
         internal void ThrowIfFailed()
         {
             switch (this.ResponseType)
             {
+                case ResponseId.WaveComplete:
                 case ResponseId.Ok:
                     // Do nothing
                     return;

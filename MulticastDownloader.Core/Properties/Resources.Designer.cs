@@ -89,6 +89,24 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Duplicate file entry in table..
+        /// </summary>
+        internal static string DuplicateFile {
+            get {
+                return ResourceManager.GetString("DuplicateFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to File not found..
+        /// </summary>
+        internal static string FileNotFound {
+            get {
+                return ResourceManager.GetString("FileNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to String cannot be null or empty..
         /// </summary>
         internal static string StringCannotBeNullOrEmpty {

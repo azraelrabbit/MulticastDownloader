@@ -5,16 +5,12 @@
 namespace MS.MulticastDownloader.Tests.Cryptography
 {
     using System;
-    using System.IO;
-    using System.Reflection;
+    using System.Collections.Generic;
+    using System.Linq;
     using System.Text;
     using System.Threading.Tasks;
-    using Org.BouncyCastle.Crypto;
-    using Org.BouncyCastle.Crypto.Parameters;
-    using Util;
     using Xunit;
     using Crypto = Core.Cryptography;
-    using PS = PCLStorage;
 
     public class EncoderTest
     {
@@ -54,24 +50,19 @@ namespace MS.MulticastDownloader.Tests.Cryptography
         }
 
         [Theory]
-        [InlineData("12345", 128, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public void PassphraseEncoderDecodesPassphraseData(string passPhrase, int strength, byte[] testData)
+        [InlineData("12345", 128, new int[] { 1, 2, 3, 4, 5, 6, 7, 8, -1, 9, 10, 11, 12 })]
+        public void PassphraseEncoderDecodesPassphraseData(string passPhrase, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             Assert.NotEmpty(passPhrase);
             Crypto.PassphraseEncoder enc = new Crypto.PassphraseEncoder(passPhrase, Encoding.UTF8, strength);
             Crypto.PassphraseEncoder dec = new Crypto.PassphraseEncoder(passPhrase, Encoding.UTF8, strength);
-            int encodedLength = enc.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = enc.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = dec.Decode(encoded);
-            Assert.Equal(testData.Length, decoded.Length);
-            Assert.Equal(testData, decoded);
+            CheckDataEquals(testData, enc, dec);
         }
 
         [Theory]
-        [InlineData("12345", "456", 128, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public void PassphraseEncoderDoesNotDecodeWithWrongPassphrase(string expectedPhrase, string actualPhrase, int strength, byte[] testData)
+        [InlineData("12345", "456", 128, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public void PassphraseEncoderDoesNotDecodeWithWrongPassphrase(string expectedPhrase, string actualPhrase, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             Assert.NotEmpty(expectedPhrase);
@@ -79,98 +70,103 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             Assert.NotEqual(expectedPhrase, actualPhrase);
             Crypto.PassphraseEncoder enc = new Crypto.PassphraseEncoder(expectedPhrase, Encoding.UTF8, strength);
             Crypto.PassphraseEncoder dec = new Crypto.PassphraseEncoder(actualPhrase, Encoding.UTF8, strength);
-            int encodedLength = enc.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = enc.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = null;
-            try
-            {
-                decoded = dec.Decode(encoded);
-            }
-            catch (Exception)
-            {
-            }
-
-            Assert.NotEqual(testData, decoded);
+            CheckDataNotEquals(testData, enc, dec);
         }
 
         [Theory]
-        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public async Task PublicEncoderDecodesPrivateKeyData(string privateKey, string publicKey, int strength, byte[] testData)
+        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public async Task PublicEncoderDecodesPrivateKeyData(string privateKey, string publicKey, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, publicKey, strength);
             Crypto.AsymmetricEncoder encodedPublic1 = await Crypto.AsymmetricEncoder.Load(publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoder encodedPrivate1 = await Crypto.AsymmetricEncoder.Load(privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            int encodedLength = encodedPrivate1.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = encodedPrivate1.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = encodedPublic1.Decode(encoded);
-            Assert.Equal(testData.Length, decoded.Length);
-            Assert.Equal(testData, decoded);
+            CheckDataEquals(testData, encodedPrivate1, encodedPublic1);
         }
 
         [Theory]
-        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public async Task PrivateEncoderDecodesPublicKeyData(string privateKey, string publicKey, int strength, byte[] testData)
+        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public async Task PrivateEncoderDecodesPublicKeyData(string privateKey, string publicKey, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, publicKey, strength);
             Crypto.AsymmetricEncoder encodedPublic1 = await Crypto.AsymmetricEncoder.Load(publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoder encodedPrivate1 = await Crypto.AsymmetricEncoder.Load(privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            int encodedLength = encodedPublic1.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = encodedPublic1.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = encodedPrivate1.Decode(encoded);
-            Assert.Equal(testData.Length, decoded.Length);
-            Assert.Equal(testData, decoded);
+            CheckDataEquals(testData, encodedPublic1, encodedPrivate1);
         }
 
         [Theory]
-        [InlineData("TestPublic.pem", 2048, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public async Task PublicEncoderDoesNotDecodePublicKeyData(string publicKey, int strength, byte[] testData)
+        [InlineData("TestPublic.pem", 2048, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public async Task PublicEncoderDoesNotDecodePublicKeyData(string publicKey, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             await this.AsymmetricKeyFilesCanBeGenerated("unused", publicKey, strength);
             Crypto.AsymmetricEncoder encodedPublic1 = await Crypto.AsymmetricEncoder.Load(publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoder encodedPublic2 = await Crypto.AsymmetricEncoder.Load(publicKey, Crypto.AsymmetricSecretFlags.None);
-            int encodedLength = encodedPublic1.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = encodedPublic1.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = null;
-            try
-            {
-                decoded = encodedPublic2.Decode(encoded);
-            }
-            catch (Exception)
-            {
-            }
-
-            Assert.NotEqual(testData, decoded);
+            CheckDataNotEquals(testData, encodedPublic1, encodedPublic2);
         }
 
         [Theory]
-        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public async Task PublicDecoderDoesNotDecodeAnotherPrivateEncoder(string privateKey, string publicKey, int strength, byte[] testData)
+        [InlineData("TestPrivate.pem", "TestPublic.pem", 2048, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public async Task PublicDecoderDoesNotDecodeAnotherPrivateEncoder(string privateKey, string publicKey, int strength, int[] testData)
         {
             Assert.NotNull(testData);
             await this.AsymmetricKeyFilesCanBeGenerated("unused", publicKey, strength);
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, "unused", strength);
             Crypto.AsymmetricEncoder encodedPublic1 = await Crypto.AsymmetricEncoder.Load(publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoder encodedPrivate1 = await Crypto.AsymmetricEncoder.Load(privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            int encodedLength = encodedPrivate1.GetEncodedOutputLength(testData.Length);
-            byte[] encoded = encodedPrivate1.Encode(testData);
-            Assert.Equal(encoded.Length, encodedLength);
-            byte[] decoded = null;
-            try
-            {
-                decoded = encodedPublic1.Decode(encoded);
-            }
-            catch (Exception)
-            {
-            }
+            CheckDataNotEquals(testData, encodedPrivate1, encodedPublic1);
+        }
 
-            Assert.NotEqual(testData, decoded);
+        private static void CheckDataNotEquals(int[] testData, Crypto.IEncoder enc, Crypto.IEncoder dec)
+        {
+            List<byte> buf = new List<byte>();
+            foreach (int v in testData)
+            {
+                if (v < 0)
+                {
+                    byte[] data = buf.ToArray();
+                    int encodedLength = enc.GetEncodedOutputLength(testData.Length);
+                    byte[] encoded = enc.Encode(data);
+                    Assert.Equal(encoded.Length, encodedLength);
+                    byte[] decoded = null;
+                    try
+                    {
+                        decoded = dec.Decode(encoded);
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    Assert.NotEqual(data, decoded);
+                }
+                else
+                {
+                    buf.Add((byte)v);
+                }
+            }
+        }
+
+        private static void CheckDataEquals(int[] testData, Crypto.IEncoder enc, Crypto.IEncoder dec)
+        {
+            List<byte> buf = new List<byte>();
+            foreach (int v in testData)
+            {
+                if (v < 0)
+                {
+                    byte[] data = buf.ToArray();
+                    int encodedLength = enc.GetEncodedOutputLength(testData.Length);
+                    byte[] encoded = enc.Encode(data);
+                    Assert.Equal(encoded.Length, encodedLength);
+                    byte[] decoded = dec.Decode(encoded);
+                    Assert.Equal(data.Length, decoded.Length);
+                    Assert.Equal(data, decoded);
+                }
+                else
+                {
+                    buf.Add((byte)v);
+                }
+            }
         }
     }
 }

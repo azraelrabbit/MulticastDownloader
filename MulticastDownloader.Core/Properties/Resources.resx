@@ -126,6 +126,12 @@
   <data name="CertificateTypeMismatch" xml:space="preserve">
     <value>Certificate file type mismatch. Expected a PEM-encoded file containing an RSA key pair.</value>
   </data>
+  <data name="DuplicateFile" xml:space="preserve">
+    <value>Duplicate file entry in table.</value>
+  </data>
+  <data name="FileNotFound" xml:space="preserve">
+    <value>File not found.</value>
+  </data>
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>
   </data>
