@@ -6,12 +6,10 @@ namespace MS.MulticastDownloader.Core.Session
 {
     using System;
     using System.IO;
-    using System.Security;
     using ProtoBuf;
 
     [ProtoContract]
     [ProtoInclude(1, typeof(SessionJoinResponse))]
-    [ProtoInclude(2, typeof(WaveCompleteResponse))]
     internal class Response
     {
         [ProtoMember(1)]

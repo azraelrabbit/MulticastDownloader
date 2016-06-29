@@ -70,9 +70,12 @@
     <Compile Include="Session\BitVector.cs" />
     <Compile Include="Session\Challenge.cs" />
     <Compile Include="Session\FileBlockRange.cs" />
+    <Compile Include="Session\FileEnumerator.cs" />
     <Compile Include="Session\FileHeader.cs" />
     <Compile Include="Session\FileSegment.cs" />
     <Compile Include="Session\FileTable.cs" />
+    <Compile Include="Session\IFileExtensions.cs" />
+    <Compile Include="Session\IFolderExtensions.cs" />
     <Compile Include="Session\NamespaceDoc.cs" />
     <Compile Include="Session\PacketStatusUpdate.cs" />
     <Compile Include="Session\Response.cs" />
@@ -80,7 +83,6 @@
     <Compile Include="Session\SegmentHeader.cs" />
     <Compile Include="Session\SessionJoinRequest.cs" />
     <Compile Include="Session\SessionJoinResponse.cs" />
-    <Compile Include="Session\WaveCompleteResponse.cs" />
     <Compile Include="Session\WaveStatusUpdate.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -51,6 +51,8 @@
     <Compile Include="Cryptography\EncoderTest.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Session\BitVectorTest.cs" />
+    <Compile Include="Session\FileHeaderTest.cs" />
+    <Compile Include="Session\FileSystemTest.cs" />
     <Compile Include="Session\FileTableTest.cs" />
     <Compile Include="Util\Runtime.cs" />
   </ItemGroup>

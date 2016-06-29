@@ -15,9 +15,9 @@ namespace MS.MulticastDownloader.Tests.Session
     public class FileTableTest
     {
         [Fact]
-        public void FileTableConstructs()
+        public void FileTableConstructsWithFileList(string[] files)
         {
-            FileTable table = new FileTable();
+            FileTable table = new FileTable(FileSystem.Current.LocalStorage, files);
             Assert.Equal(0, table.NumSegments);
             Assert.Equal(0, table.FileTableEntries.Count);
         }
@@ -47,11 +47,11 @@ namespace MS.MulticastDownloader.Tests.Session
                 }
             }
 
-            IList<FileTable.FileTableEntry> tableEntries = null;
+            ICollection<FileTable.FileTableEntry> tableEntries = null;
             expectedNumSegments /= blockSize;
-            using (FileTable table = new FileTable())
+            using (FileTable table = new FileTable(await FileSystem.Current.LocalStorage.GetFolderAsync(inFolder), fileNames))
             {
-                await table.InitRead(blockSize, folder.Path);
+                await table.InitRead(blockSize);
                 CheckReadBlocks(blockSize, expectedNumSegments, fileNames, fileSizes, table);
                 tableEntries = table.FileTableEntries;
             }
@@ -63,9 +63,9 @@ namespace MS.MulticastDownloader.Tests.Session
             }
 
             folder = await RecreateFolder(outFolder);
-            using (FileTable table = new FileTable())
+            using (FileTable table = new FileTable(await FileSystem.Current.LocalStorage.GetFolderAsync(outFolder), fileNames))
             {
-                await table.InitWrite(folder, files);
+                await table.InitWrite();
                 await CheckWriteBlocks(blockSize, expectedNumSegments, fileNames, fileSizes, folder, table);
             }
         }
@@ -93,11 +93,11 @@ namespace MS.MulticastDownloader.Tests.Session
                 expectedNumSegments += data.Length;
             }
 
-            IList<FileTable.FileTableEntry> tableEntries = null;
+            ICollection<FileTable.FileTableEntry> tableEntries = null;
             expectedNumSegments /= blockSize;
-            using (FileTable table = new FileTable())
+            using (FileTable table = new FileTable(await FileSystem.Current.LocalStorage.GetFolderAsync(inFolder), new string[] { fileName }))
             {
-                await table.InitRead(blockSize, folder.Path);
+                await table.InitRead(blockSize);
                 CheckReadBlocks(blockSize, expectedNumSegments, new string[] { fileName }, new long[] { fileSize }, table);
                 tableEntries = table.FileTableEntries;
             }
@@ -109,9 +109,9 @@ namespace MS.MulticastDownloader.Tests.Session
             }
 
             folder = await RecreateFolder(outFolder);
-            using (FileTable table = new FileTable())
+            using (FileTable table = new FileTable(await FileSystem.Current.LocalStorage.GetFolderAsync(outFolder), new string[] { fileName }))
             {
-                await table.InitWrite(folder, files);
+                await table.InitWrite();
                 await CheckWriteBlocks(blockSize, expectedNumSegments, new string[] { fileName }, new long[] { fileSize }, folder, table);
             }
         }
@@ -121,10 +121,8 @@ namespace MS.MulticastDownloader.Tests.Session
             Assert.Equal(expectedNumSegments, table.NumSegments);
             long totalSegments = 0;
             long k = 0;
-            for (int i = 0; i < table.FileTableEntries.Count; ++i)
+            foreach (FileTable.FileTableEntry entry in table.FileTableEntries)
             {
-                FileTable.FileTableEntry entry = table.FileTableEntries[i];
-                Assert.Equal(i, entry.SegmentStart);
                 Assert.NotNull(entry.FileStream);
                 Assert.Equal(entry.FileHeader.Blocks.Length, entry.Segments.Count);
                 for (int j = 0; j < entry.Segments.Count; ++j)
@@ -150,12 +148,12 @@ namespace MS.MulticastDownloader.Tests.Session
             long totalSegments = 0;
             long totalFileSizeSegments = 0;
             long k = 0;
+            long i = 0;
             Assert.Equal(table.FileTableEntries.Count, count);
-            for (int i = 0; i < count; ++i)
+            foreach (FileTable.FileTableEntry entry in table.FileTableEntries)
             {
                 IFile file = await folder.GetFileAsync(fileNames[i]);
                 Assert.NotNull(file);
-                FileTable.FileTableEntry entry = table.FileTableEntries[i];
                 Assert.NotNull(entry.FileStream);
                 totalFileSizeSegments += entry.FileStream.Length;
                 Assert.Equal(entry.FileHeader.Blocks.Length, entry.Segments.Count);
@@ -171,6 +169,8 @@ namespace MS.MulticastDownloader.Tests.Session
                     totalSegments += segment.Block.Length;
                     ++k;
                 }
+
+                ++i;
             }
 
             Assert.Equal(expectedNumSegments, totalSegments);

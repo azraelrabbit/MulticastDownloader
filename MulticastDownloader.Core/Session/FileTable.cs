@@ -19,10 +19,33 @@ namespace MS.MulticastDownloader.Core.Session
     {
         private ILog log = LogManager.GetLogger<FileTable>();
         private bool disposed;
+        private List<FileHeader> headers = new List<FileHeader>();
         private List<FileTableEntry> fileTableEntries = new List<FileTableEntry>();
-        private long nextSeq;
+        private IFolder rootFolder;
         private bool initialized;
-        private bool keepStreams;
+
+        internal FileTable(IFolder rootFolder, IEnumerable<string> files)
+        {
+            Contract.Requires(rootFolder != null);
+            Contract.Requires(files != null);
+            this.rootFolder = rootFolder;
+            foreach (string file in files)
+            {
+                FileHeader header = new FileHeader();
+                header.Name = file;
+            }
+
+            this.CheckUnique(this.headers);
+        }
+
+        internal FileTable(IFolder rootFolder, IEnumerable<FileHeader> headers)
+        {
+            Contract.Requires(rootFolder != null);
+            Contract.Requires(headers != null);
+            this.rootFolder = rootFolder;
+            this.headers = headers.ToList();
+            this.CheckUnique(this.headers);
+        }
 
         /// <summary>
         /// Finalizes an instance of the <see cref="FileTable"/> class.
@@ -32,7 +55,15 @@ namespace MS.MulticastDownloader.Core.Session
             this.Dispose(false);
         }
 
-        internal IList<FileTableEntry> FileTableEntries
+        internal ICollection<FileHeader> FileHeaders
+        {
+            get
+            {
+                return this.headers;
+            }
+        }
+
+        internal ICollection<FileTableEntry> FileTableEntries
         {
             get
             {
@@ -44,8 +75,21 @@ namespace MS.MulticastDownloader.Core.Session
         {
             get
             {
-                Contract.Requires(this.initialized);
-                return this.nextSeq;
+                if (this.fileTableEntries != null)
+                {
+                    long ret = 0;
+                    foreach (FileTableEntry entry in this.fileTableEntries)
+                    {
+                        if (entry.Segments != null)
+                        {
+                            ret += entry.Segments.Count;
+                        }
+                    }
+
+                    return ret;
+                }
+
+                return 0;
             }
         }
 
@@ -58,158 +102,56 @@ namespace MS.MulticastDownloader.Core.Session
             GC.SuppressFinalize(this);
         }
 
-        internal void InitWrite(IDictionary<string, Stream> fileDataByNames, IEnumerable<FileHeader> files, bool ownsStreams)
+        internal async Task Clean()
         {
-            Contract.Requires(fileDataByNames != null);
-            Contract.Requires(files != null);
-            Contract.Requires(!this.initialized);
-            this.initialized = true;
-            this.keepStreams = !ownsStreams;
-            try
+            foreach (FileHeader header in this.headers)
             {
-                foreach (FileHeader header in files)
-                {
-                    FileTableEntry fte = new FileTableEntry();
-                    fte.FileHeader = header;
-                    fte.FileStream = fileDataByNames[header.Name];
-                    foreach (FileBlockRange block in header.Blocks)
-                    {
-                        FileTableSegment segment = new FileTableSegment();
-                        segment.Block = block;
-                        segment.Entry = fte;
-                        fte.Segments.Add(segment);
-                        ++this.nextSeq;
-                    }
-
-                    this.fileTableEntries.Add(fte);
-                    this.log.DebugFormat("{0} size: {1} bytes", header.Name, header.Length);
-                    fte.FileStream.SetLength(fte.FileHeader.Length);
-                    fte.FileStream.Position = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                this.log.Error(ex);
-                DisposeStreams(fileDataByNames);
-                throw;
+                await this.rootFolder.Delete(header.Name);
             }
         }
 
-        internal async Task InitWrite(IFolder rootFolder, IEnumerable<FileHeader> files)
-        {
-            Contract.Requires(rootFolder != null);
-            Contract.Requires(files != null);
-            Contract.Requires(!this.initialized);
-            Contract.Ensures(this.initialized);
-            this.initialized = true;
-            Dictionary<string, Stream> fileDataByNames = new Dictionary<string, Stream>(StringComparer.Ordinal);
-            try
-            {
-                foreach (FileHeader header in files)
-                {
-                    string curPath = Path.Combine(rootFolder.Path, header.Name);
-                    this.log.DebugFormat("File: opening {0}", curPath);
-                    string dirName = Path.GetDirectoryName(curPath);
-                    IFolder subfolder = await rootFolder.CreateFolderAsync(dirName, CreationCollisionOption.OpenIfExists);
-                    IFile file = await subfolder.CreateFileAsync(Path.GetFileName(curPath), CreationCollisionOption.ReplaceExisting);
-                    Stream s = await file.OpenAsync(FileAccess.ReadAndWrite);
-                    fileDataByNames.Add(curPath, s);
-                }
-
-                this.InitWrite(fileDataByNames, files, true);
-            }
-            catch (Exception ex)
-            {
-                this.log.Error(ex);
-                DisposeStreams(fileDataByNames);
-                throw;
-            }
-        }
-
-        internal void InitRead(int blockSize, IDictionary<string, Stream> fileDataByNames, bool ownsStreams)
-        {
-            Contract.Requires(blockSize > 0);
-            Contract.Requires(fileDataByNames != null);
-            this.initialized = true;
-            this.keepStreams = !ownsStreams;
-            try
-            {
-                foreach (KeyValuePair<string, Stream> kvp in fileDataByNames)
-                {
-                    this.log.DebugFormat("{0} size: {1} bytes", kvp.Key, kvp.Value.Length);
-                    List<FileBlockRange> blocks = new List<FileBlockRange>();
-                    FileTableEntry fte = new FileTableEntry();
-                    fte.FileStream = kvp.Value;
-                    fte.FileHeader = new FileHeader();
-                    fte.FileHeader.Name = kvp.Key;
-                    long remaining = kvp.Value.Length;
-                    kvp.Value.Position = 0;
-                    while (remaining > 0)
-                    {
-                        FileTableSegment seg = new FileTableSegment();
-                        int segSize = blockSize;
-                        if (remaining < blockSize)
-                        {
-                            segSize = (int)remaining;
-                        }
-
-                        seg.Entry = fte;
-                        FileBlockRange fbr = new FileBlockRange();
-                        fbr.SegmentId = this.nextSeq++;
-                        fbr.Offset = kvp.Value.Length - remaining;
-                        fbr.Length = segSize;
-                        seg.Block = fbr;
-                        blocks.Add(fbr);
-                        fte.Segments.Add(seg);
-                        remaining -= segSize;
-                    }
-
-                    fte.FileHeader.Blocks = blocks.ToArray();
-                    this.fileTableEntries.Add(fte);
-                }
-            }
-            catch (Exception ex)
-            {
-                this.log.Error(ex);
-                DisposeStreams(fileDataByNames);
-                throw;
-            }
-        }
-
-        internal async Task InitRead(int blockSize, string fileOrDirectoryName)
+        internal async Task InitWrite()
         {
             Contract.Requires(!this.initialized);
             Contract.Ensures(this.initialized);
             this.initialized = true;
-            this.log.DebugFormat("Initializing by file or directory name: {0}", fileOrDirectoryName);
-            IFolder folder = await FileSystem.Current.GetFolderFromPathAsync(fileOrDirectoryName);
-            Dictionary<string, Stream> fileDataByNames = new Dictionary<string, Stream>(StringComparer.Ordinal);
-            try
+            List<Task> pendingOperations = new List<Task>();
+            foreach (FileHeader header in this.headers)
             {
-                if (folder != null)
-                {
-                    await this.GetFilesRecursive(string.Empty, folder, fileDataByNames);
-                }
-
-                IFile file = await FileSystem.Current.GetFileFromPathAsync(fileOrDirectoryName);
-                if (file != null)
-                {
-                    await this.GetFileData(string.Empty, file, fileDataByNames);
-                }
-
-                if (folder == null && file == null)
-                {
-                    throw new FileNotFoundException(Resources.FileNotFound, fileOrDirectoryName);
-                }
-            }
-            catch (Exception ex)
-            {
-                this.log.Error(ex);
-                DisposeStreams(fileDataByNames);
-                throw;
+                string curPath = Path.Combine(this.rootFolder.Path, header.Name);
+                this.log.DebugFormat("File: opening {0}", curPath);
+                string dirName = Path.GetDirectoryName(curPath);
+                IFile file = await this.rootFolder.Create(header.Name, false);
+                Stream s = await file.OpenAsync(FileAccess.ReadAndWrite);
+                FileTableEntry fte = InitFteWrite(header, s);
+                this.fileTableEntries.Add(fte);
+                this.log.DebugFormat("{0} size: {1} bytes", header.Name, header.Length);
+                pendingOperations.Add(file.Resize(header.Length));
             }
 
-            this.InitRead(blockSize, fileDataByNames, true);
+            foreach (Task pendingOperation in pendingOperations)
+            {
+                await pendingOperation;
+            }
+        }
+
+        internal async Task InitRead(int blockSize)
+        {
+            Contract.Requires(blockSize >= 1000);
+            Contract.Requires(!this.initialized);
+            Contract.Ensures(this.initialized);
+            this.initialized = true;
+            SequenceGenerator g = new SequenceGenerator();
+            List<Task> pendingOperations = new List<Task>();
+            this.log.DebugFormat("Initializing with files under directory name: {0}", this.rootFolder.Path);
+            foreach (FileHeader header in this.headers)
+            {
+                IFile file = await this.rootFolder.Create(header.Name, true);
+                Stream s = await file.OpenAsync(FileAccess.Read);
+                this.log.DebugFormat("{0} size: {1} bytes", header.Name, s.Length);
+                this.InitFteRead(blockSize, header, s, g);
+                pendingOperations.Add(Task.Run(async () => header.Checksum = await file.GetChecksum()));
+            }
         }
 
         /// <summary>
@@ -223,12 +165,9 @@ namespace MS.MulticastDownloader.Core.Session
                 this.disposed = true;
                 if (disposing)
                 {
-                    if (!this.keepStreams)
+                    foreach (FileTableEntry fte in this.fileTableEntries)
                     {
-                        foreach (FileTableEntry fte in this.fileTableEntries)
-                        {
-                            fte.Dispose();
-                        }
+                        fte.Dispose();
                     }
 
                     this.fileTableEntries.Clear();
@@ -236,39 +175,93 @@ namespace MS.MulticastDownloader.Core.Session
             }
         }
 
-        private static void DisposeStreams(IDictionary<string, Stream> fileDataByNames)
+        private static FileTableEntry InitFteWrite(FileHeader header, Stream s)
         {
-            foreach (KeyValuePair<string, Stream> kvp in fileDataByNames)
+            try
             {
-                kvp.Value.Dispose();
+                FileTableEntry fte = new FileTableEntry();
+                fte.FileHeader = header;
+                fte.FileStream = s;
+                foreach (FileBlockRange block in header.Blocks)
+                {
+                    FileTableSegment segment = new FileTableSegment();
+                    segment.Block = block;
+                    segment.Entry = fte;
+                    fte.Segments.Add(segment);
+                }
+
+                return fte;
+            }
+            catch (Exception)
+            {
+                if (s != null)
+                {
+                    s.Dispose();
+                }
+
+                throw;
             }
         }
 
-        private async Task GetFilesRecursive(string path, IFolder folder, IDictionary<string, Stream> fileDataByNames)
+        private void CheckUnique(IEnumerable<FileHeader> files)
         {
-            string curPath = Path.Combine(path, folder.Name);
-            foreach (IFile file in await folder.GetFilesAsync())
+            HashSet<string> fileNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (FileHeader header in files)
             {
-                await this.GetFileData(curPath, file, fileDataByNames);
-            }
+                if (fileNames.Contains(header.Name))
+                {
+                    throw new InvalidOperationException(Resources.DuplicateFile);
+                }
 
-            foreach (IFolder childFolder in await folder.GetFoldersAsync())
-            {
-                await this.GetFilesRecursive(curPath, childFolder, fileDataByNames);
+                fileNames.Add(header.Name);
             }
         }
 
-        private async Task GetFileData(string path, IFile file, IDictionary<string, Stream> fileDataByNames)
+        private void InitFteRead(int blockSize, FileHeader header, Stream s, SequenceGenerator g)
         {
-            string filePath = Path.Combine(path, file.Name);
-            this.log.DebugFormat("File: {0}", filePath);
-            Stream s = await file.OpenAsync(FileAccess.Read);
-            if (fileDataByNames.ContainsKey(filePath))
+            try
             {
-                throw new InvalidOperationException(Resources.DuplicateFile);
-            }
+                List<FileBlockRange> blocks = new List<FileBlockRange>();
+                FileTableEntry fte = new FileTableEntry();
+                fte.FileStream = s;
+                fte.FileHeader = header;
+                long remaining = s.Length;
+                s.Position = 0;
+                while (remaining > 0)
+                {
+                    FileBlockRange fbr = new FileBlockRange();
+                    fbr.SegmentId = g.GetNextSeq();
+                    fbr.Offset = s.Length - remaining;
+                    fbr.Length = blockSize - FileSegment.GetSegmentOverhead(fbr.SegmentId, blockSize);
+                    if (remaining < fbr.Length)
+                    {
+                        fbr.Length = (int)remaining;
+                    }
 
-            fileDataByNames[filePath] = s;
+                    byte[] b = new byte[fbr.Length];
+                    s.Seek(fbr.Offset, SeekOrigin.Begin);
+                    s.Read(b, 0, (int)fbr.Length);
+
+                    FileTableSegment seg = new FileTableSegment();
+                    seg.Entry = fte;
+                    seg.Block = fbr;
+                    blocks.Add(fbr);
+                    fte.Segments.Add(seg);
+                    remaining -= fbr.Length;
+                }
+
+                fte.FileHeader.Blocks = blocks.ToArray();
+                this.fileTableEntries.Add(fte);
+            }
+            catch (Exception)
+            {
+                if (s != null)
+                {
+                    s.Dispose();
+                }
+
+                throw;
+            }
         }
 
         internal class FileTableSegment
@@ -376,6 +369,16 @@ namespace MS.MulticastDownloader.Core.Session
                         }
                     }
                 }
+            }
+        }
+
+        private class SequenceGenerator
+        {
+            private long nextSeq = 0;
+
+            internal long GetNextSeq()
+            {
+                return this.nextSeq++;
             }
         }
     }
