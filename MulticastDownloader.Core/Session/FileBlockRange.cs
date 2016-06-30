@@ -63,7 +63,7 @@ namespace MS.MulticastDownloader.Core.Session
         /// </returns>
         public override int GetHashCode()
         {
-            return (int)this.Length + (int)this.Offset + (int)this.SegmentId;
+            return this.Length.GetHashCode() + this.Offset.GetHashCode() + this.SegmentId.GetHashCode();
         }
     }
 }

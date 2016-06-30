@@ -70,10 +70,11 @@
     <Compile Include="Session\BitVector.cs" />
     <Compile Include="Session\Challenge.cs" />
     <Compile Include="Session\FileBlockRange.cs" />
+    <Compile Include="Session\FileChunk.cs" />
     <Compile Include="Session\FileEnumerator.cs" />
     <Compile Include="Session\FileHeader.cs" />
     <Compile Include="Session\FileSegment.cs" />
-    <Compile Include="Session\FileTable.cs" />
+    <Compile Include="Session\FileSet.cs" />
     <Compile Include="Session\IFileExtensions.cs" />
     <Compile Include="Session\IFolderExtensions.cs" />
     <Compile Include="Session\NamespaceDoc.cs" />

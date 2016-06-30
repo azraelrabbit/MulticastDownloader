@@ -53,7 +53,7 @@
     <Compile Include="Session\BitVectorTest.cs" />
     <Compile Include="Session\FileHeaderTest.cs" />
     <Compile Include="Session\FileSystemTest.cs" />
-    <Compile Include="Session\FileTableTest.cs" />
+    <Compile Include="Session\FileSetTest.cs" />
     <Compile Include="Util\Runtime.cs" />
   </ItemGroup>
   <ItemGroup>

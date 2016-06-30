@@ -5,6 +5,7 @@
 namespace MS.MulticastDownloader.Tests.Session
 {
     using System;
+    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Core.Session;
     using PCLStorage;
@@ -66,6 +67,29 @@ namespace MS.MulticastDownloader.Tests.Session
                 bool deleted = await folder.Delete(fileName);
                 Assert.True(deleted);
             }
+        }
+
+        [Theory]
+        [InlineData("testFolder", true, @"a;b\c;de;f", @"a;b\c;de;f", "")]
+        [InlineData("testFolder", false, @"a;b\c;de;f", @"a;de;f", "")]
+        [InlineData("testFolder", false, @"a;b\c;de;f", @"a", "a")]
+        public async Task IFolderCanEnumerateFiles(string folderName, bool recursive, string files, string expected, string includes)
+        {
+            IFolder folder = await FileSystem.Current.LocalStorage.CreateFolderAsync(folderName, CreationCollisionOption.ReplaceExisting);
+            HashSet<string> expectedFiles = new HashSet<string>(expected.Split(';'));
+            foreach (string file in files.Split(';'))
+            {
+                IFile f = await folder.Create(file, false);
+            }
+
+            ICollection<string> enumerated = await folder.GetFilesFromPath(recursive, (p) => p.Name.Contains(includes));
+            Assert.True(enumerated.Count == expectedFiles.Count);
+            foreach (string file in enumerated)
+            {
+                Assert.True(expectedFiles.Remove(file));
+            }
+
+            Assert.Equal(0, expectedFiles.Count);
         }
     }
 }

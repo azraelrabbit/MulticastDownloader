@@ -74,9 +74,9 @@ namespace MS.MulticastDownloader.Core.Session
         {
             if (other != null && other != this)
             {
-                return string.Compare(this.Name, other.Name, StringComparison.Ordinal) != 0
+                return (string.Compare(this.Name ?? string.Empty, other.Name ?? string.Empty, StringComparison.Ordinal) == 0)
                     && this.Checksum == other.Checksum
-                    && (this.Blocks == other.Blocks || this.Blocks.SequenceEqual(other.Blocks));
+                    && (this.Blocks ?? new FileBlockRange[] { }).SequenceEqual(other.Blocks ?? new FileBlockRange[] { });
             }
 
             return other == this;
@@ -90,7 +90,7 @@ namespace MS.MulticastDownloader.Core.Session
         /// </returns>
         public override int GetHashCode()
         {
-            int ret = (this.Name ?? string.Empty).GetHashCode() + this.Checksum;
+            int ret = (this.Name ?? string.Empty).GetHashCode() + this.Checksum.GetHashCode();
             if (this.Blocks != null)
             {
                 foreach (FileBlockRange fbr in this.Blocks)
