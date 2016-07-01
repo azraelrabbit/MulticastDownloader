@@ -32,6 +32,7 @@ namespace MS.MulticastDownloader.Core.Session
             {
                 FileHeader header = new FileHeader();
                 header.Name = file;
+                this.headers.Add(header);
             }
 
             this.CheckUnique(this.headers);
