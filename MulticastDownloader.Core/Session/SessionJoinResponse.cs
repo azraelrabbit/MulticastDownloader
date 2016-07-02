@@ -10,13 +10,13 @@ namespace MS.MulticastDownloader.Core.Session
     [ProtoContract]
     internal class SessionJoinResponse : Response
     {
-        [ProtoMember(2)]
+        [ProtoMember(1)]
         internal string MulticastAddress { get; set; }
 
-        [ProtoMember(3)]
-        internal ushort MulticastPort { get; set; }
+        [ProtoMember(2)]
+        internal int MulticastPort { get; set; }
 
-        [ProtoMember(4)]
+        [ProtoMember(3)]
         internal FileHeader[] Files { get; set; }
 
         internal long CountSegments

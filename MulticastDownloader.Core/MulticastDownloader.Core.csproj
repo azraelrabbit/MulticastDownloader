@@ -60,6 +60,13 @@
     <Compile Include="Cryptography\NamespaceDoc.cs" />
     <Compile Include="Cryptography\PassphraseEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricEncoder.cs" />
+    <Compile Include="IO\ChunkWriter.cs" />
+    <Compile Include="IO\ClientConnection.cs" />
+    <Compile Include="IO\ConnectionBase.cs" />
+    <Compile Include="IO\NamespaceDoc.cs" />
+    <Compile Include="IO\TaskExtensionMethods.cs" />
+    <Compile Include="UriParameters.cs" />
+    <Compile Include="MulticastClient.cs" />
     <Compile Include="NamespaceDoc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -75,8 +82,8 @@
     <Compile Include="Session\FileHeader.cs" />
     <Compile Include="Session\FileSegment.cs" />
     <Compile Include="Session\FileSet.cs" />
-    <Compile Include="Session\IFileExtensions.cs" />
-    <Compile Include="Session\IFolderExtensions.cs" />
+    <Compile Include="IO\IFileExtensions.cs" />
+    <Compile Include="IO\IFolderExtensions.cs" />
     <Compile Include="Session\NamespaceDoc.cs" />
     <Compile Include="Session\PacketStatusUpdate.cs" />
     <Compile Include="Session\Response.cs" />

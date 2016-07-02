@@ -11,6 +11,7 @@ namespace MS.MulticastDownloader.Core.Session
     using System.Linq;
     using System.Threading.Tasks;
     using Common.Logging;
+    using IO;
     using PCLStorage;
     using Properties;
 
@@ -151,7 +152,7 @@ namespace MS.MulticastDownloader.Core.Session
 
         internal async Task InitRead(int blockSize)
         {
-            Contract.Requires(blockSize >= 1000);
+            Contract.Requires(blockSize >= 576);
             SequenceGenerator g = new SequenceGenerator();
             List<Task> pendingOperations = new List<Task>();
             this.log.DebugFormat("Initializing with files under directory name: {0}", this.rootFolder.Path);

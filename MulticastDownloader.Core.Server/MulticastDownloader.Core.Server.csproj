@@ -53,7 +53,12 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="IO\ChunkReader.cs" />
+    <Compile Include="IO\NamespaceDoc.cs" />
+    <Compile Include="IO\ServerConnection.cs" />
+    <Compile Include="IO\ServerListener.cs" />
+    <Compile Include="MulticastHost.cs" />
+    <Compile Include="MulticastServer.cs" />
     <Compile Include="NamespaceDoc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

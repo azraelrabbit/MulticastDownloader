@@ -7,6 +7,9 @@ namespace MS.MulticastDownloader.Core.Session
     using System;
     using System.Collections;
     using System.Collections.Generic;
+    using System.Diagnostics.Contracts;
+    using System.Linq;
+    using System.Threading.Tasks;
 
     // Internal implementation for a binary bitmap.
     internal class BitVector : IList<bool>
@@ -104,6 +107,35 @@ namespace MS.MulticastDownloader.Core.Session
                     this.RawBits[idx] &= (byte)(~(1 << offset));
                 }
             }
+        }
+
+        /// <summary>
+        /// Computes the union of the collection of bit vectors in the parameter list.
+        /// </summary>
+        /// <param name="vectors">The vectors to union.</param>
+        /// <returns>A <see cref="BitVector"/> containing the union of all sub-vector values.</returns>
+        public static async Task<BitVector> UnionOf(ICollection<BitVector> vectors)
+        {
+            BitVector first = vectors.FirstOrDefault();
+            if (vectors == null || first == null)
+            {
+                throw new ArgumentException("vectors");
+            }
+
+            long countBits = first.RawBits.LongCount();
+            BitVector ret = new BitVector(first.LongCount);
+            await Task.Run(() =>
+            {
+                Parallel.For(0, countBits, (r, s) =>
+                {
+                    foreach (BitVector bv in vectors)
+                    {
+                        ret.RawBits[r] |= bv.RawBits[r];
+                    }
+                });
+            });
+
+            return ret;
         }
 
         /// <summary>

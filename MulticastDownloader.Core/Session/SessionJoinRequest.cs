@@ -14,5 +14,9 @@ namespace MS.MulticastDownloader.Core.Session
 
         [ProtoMember(2)]
         internal byte[] ChallengeResponse { get; set; }
+
+        // Application-defined state
+        [ProtoMember(3)]
+        internal int State { get; set; }
     }
 }

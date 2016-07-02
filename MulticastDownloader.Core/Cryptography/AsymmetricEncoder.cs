@@ -9,8 +9,6 @@ namespace MS.MulticastDownloader.Core.Cryptography
     using System.Threading.Tasks;
     using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Crypto.Engines;
-    using Org.BouncyCastle.Crypto.Paddings;
-    using Org.BouncyCastle.Crypto.Parameters;
     using Org.BouncyCastle.OpenSsl;
     using PCLStorage;
     using Properties;
@@ -48,24 +46,26 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <summary>
         /// Loads the specified cert data.
         /// </summary>
+        /// <param name="folder">The cert folder.</param>
         /// <param name="certData">The cert data.</param>
         /// <param name="flags">The flags.</param>
         /// <returns>An <see cref="AsymmetricEncoder"/>.</returns>
-        public static async Task<AsymmetricEncoder> Load(string certData, AsymmetricSecretFlags flags)
+        public static async Task<AsymmetricEncoder> Load(IFolder folder, string certData, AsymmetricSecretFlags flags)
         {
-            return await Load(certData, flags, null);
+            return await Load(folder, certData, flags, null);
         }
 
         /// <summary>
         /// Loads the specified cert data.
         /// </summary>
+        /// <param name="folder">The cert folder.</param>
         /// <param name="certData">The cert data.</param>
         /// <param name="flags">The cert flags.</param>
         /// <param name="passwordFinder">The password finder.</param>
         /// <returns>An <see cref="AsymmetricEncoder"/>.</returns>
-        public static async Task<AsymmetricEncoder> Load(string certData, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
+        public static async Task<AsymmetricEncoder> Load(IFolder folder, string certData, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
         {
-            IFile keyFile = await FileSystem.Current.LocalStorage.GetFileAsync(certData);
+            IFile keyFile = await folder.GetFileAsync(certData);
             using (Stream certStream = await keyFile.OpenAsync(FileAccess.Read))
             {
                 AsymmetricEncoder ret = new AsymmetricEncoder(certStream, flags, passwordFinder);

@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
     using System;
     using System.IO;
     using System.Threading.Tasks;
+    using IO;
     using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Crypto.Generators;
     using Org.BouncyCastle.OpenSsl;
@@ -40,14 +41,15 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <summary>
         /// Writes the PEM-encoded asymmetric key pair cipher to a pair of streams.
         /// </summary>
+        /// <param name="folder">The certificate folder.</param>
         /// <param name="privateKeyFile">The private key file.</param>
         /// <param name="publicKeyFile">The public key file.</param>
         /// <param name="strength">The strength.</param>
         /// <returns>A task object.</returns>
-        public static async Task WriteAsymmetricKeyPair(string privateKeyFile, string publicKeyFile, int strength)
+        public static async Task WriteAsymmetricKeyPair(IFolder folder, string privateKeyFile, string publicKeyFile, int strength)
         {
-            IFile privateFile = await FileSystem.Current.LocalStorage.CreateFileAsync(privateKeyFile, CreationCollisionOption.ReplaceExisting);
-            IFile publicFile = await FileSystem.Current.LocalStorage.CreateFileAsync(publicKeyFile, CreationCollisionOption.ReplaceExisting);
+            IFile privateFile = await folder.Create(privateKeyFile, false);
+            IFile publicFile = await folder.Create(publicKeyFile, false);
             using (Stream privateStream = await privateFile.OpenAsync(FileAccess.ReadAndWrite))
             using (Stream publicStream = await publicFile.OpenAsync(FileAccess.ReadAndWrite))
             {

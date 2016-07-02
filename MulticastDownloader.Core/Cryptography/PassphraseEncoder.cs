@@ -25,7 +25,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <summary>
         /// Initializes a new instance of the <see cref="PassphraseEncoder"/> class.
         /// </summary>
-        /// <param name="passPhrase">The pass phrase.</param>
+        /// <param name="passPhrase">The passphrase.</param>
         /// <param name="enc">The encoding.</param>
         /// <param name="blockBits">The desired encoding length in bits.</param>
         public PassphraseEncoder(string passPhrase, Encoding enc, int blockBits)
@@ -45,6 +45,8 @@ namespace MS.MulticastDownloader.Core.Cryptography
                 throw new ArgumentException(Resources.BlockSizeMustBeMultipleOf8);
             }
 
+            this.Passphrase = passPhrase;
+            this.Strength = blockBits;
             this.cipher = CreateCipher(passPhrase, enc, blockBits / 8);
             IBlockCipherPadding padding = new Pkcs7Padding();
             this.encoder = new PaddedBufferedBlockCipher(new RijndaelEngine(blockBits), padding);
@@ -52,6 +54,30 @@ namespace MS.MulticastDownloader.Core.Cryptography
             int keySize = blockBits >> 3;
             this.encoder.Init(true, this.cipher);
             this.decoder.Init(false, this.cipher);
+        }
+
+        /// <summary>
+        /// Gets the passphrase.
+        /// </summary>
+        /// <value>
+        /// The passphrase.
+        /// </value>
+        public string Passphrase
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// Gets the block bits.
+        /// </summary>
+        /// <value>
+        /// The desired encoding length in bits.
+        /// </value>
+        public int Strength
+        {
+            get;
+            private set;
         }
 
         /// <summary>

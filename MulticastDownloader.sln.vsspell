@@ -6,9 +6,11 @@
   <SelectedLanguages />
   <InheritIgnoredWords>True</InheritIgnoredWords>
   <IgnoredWords>
+    <Ignore>multicast</Ignore>
     <Ignore>passphrase</Ignore>
-    <Ignore>unencoded</Ignore>
     <Ignore>serializable</Ignore>
+    <Ignore>unencoded</Ignore>
+    <Ignore>uri</Ignore>
   </IgnoredWords>
   <InheritExclusionExpressions>True</InheritExclusionExpressions>
   <InheritIgnoredFilePatterns>True</InheritIgnoredFilePatterns>

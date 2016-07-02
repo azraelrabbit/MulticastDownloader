@@ -2,7 +2,7 @@
 // Copyright (c) 2016 MS.
 // </copyright>
 
-namespace MS.MulticastDownloader.Core.Session
+namespace MS.MulticastDownloader.Core.IO
 {
     using System;
     using System.Collections.Generic;

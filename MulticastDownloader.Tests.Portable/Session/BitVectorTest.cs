@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Tests.Session
 {
+    using System.Threading.Tasks;
     using Core.Session;
     using Xunit;
 
@@ -77,6 +78,34 @@ namespace MS.MulticastDownloader.Tests.Session
             bool expected = !bv[flipIndex];
             bv[flipIndex] = !bv[flipIndex];
             Assert.Equal(expected, bv[flipIndex]);
+        }
+
+        [Theory]
+        [InlineData(new bool[] { false, false, false }, new bool[] { false, false, false })]
+        [InlineData(new bool[] { false, false, false }, new bool[] { true, true, true })]
+        [InlineData(new bool[] { false, true, false }, new bool[] { true, false, true })]
+        [InlineData(new bool[] { true, false, true }, new bool[] { false, true, false })]
+        public async Task BitVectorUnionsTwoSequences(bool[] seq1, bool[] seq2)
+        {
+            Assert.Equal(seq1.Length, seq2.Length);
+            BitVector bv1 = new BitVector(seq1.Length);
+            for (int i = 0; i < seq1.Length; ++i)
+            {
+                bv1[i] = seq1[i];
+            }
+
+            BitVector bv2 = new BitVector(seq2.Length);
+            for (int i = 0; i < seq2.Length; ++i)
+            {
+                bv2[i] = seq2[i];
+            }
+
+            BitVector c = await BitVector.UnionOf(new BitVector[] { bv1, bv2 });
+            Assert.Equal(seq1.Length, c.LongCount);
+            for (int i = 0; i < seq2.Length; ++i)
+            {
+                Assert.Equal(bv1[i] || bv2[i], c[i]);
+            }
         }
     }
 }

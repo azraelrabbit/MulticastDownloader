@@ -8,6 +8,7 @@
     "MsBuild.NuGet.Pack": "2.0.0",
     "PCLStorage": "1.0.2",
     "protobuf-net": "2.0.0.668",
+    "rda.SocketsForPCL": "1.2.2",
     "StyleCop.Analyzers": "1.0.0",
     "System.Runtime.Analyzers": "1.1.0"
   },

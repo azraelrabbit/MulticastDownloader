@@ -126,11 +126,20 @@
   <data name="CertificateTypeMismatch" xml:space="preserve">
     <value>Certificate file type mismatch. Expected a PEM-encoded file containing an RSA key pair.</value>
   </data>
+  <data name="ClientNotInitialized" xml:space="preserve">
+    <value>TCP client not initialized.</value>
+  </data>
   <data name="DuplicateFile" xml:space="preserve">
     <value>Duplicate file entry in table.</value>
   </data>
   <data name="FileNotFound" xml:space="preserve">
     <value>File not found.</value>
+  </data>
+  <data name="InvalidEncoder" xml:space="preserve">
+    <value>Invalid encoder object.</value>
+  </data>
+  <data name="InvalidUriScheme" xml:space="preserve">
+    <value>Invalid URI scheme.</value>
   </data>
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>

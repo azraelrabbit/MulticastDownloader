@@ -15,7 +15,7 @@ namespace MS.MulticastDownloader.Tests.IO
     using Xunit;
     using IO = System.IO;
 
-    internal class ChunkTest
+    public class ChunkTest
     {
         [Theory]
         [InlineData(new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 })]
@@ -25,6 +25,63 @@ namespace MS.MulticastDownloader.Tests.IO
             IEnumerable<FileChunk> chunks = this.BuildChunks(headers, false);
             ChunkReader reader = new ChunkReader(chunks);
             Assert.Equal(reader.NumChunks, chunks.LongCount());
+        }
+
+        [Theory]
+        [InlineData(new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 })]
+        public void ChunkWriterConstructs(long[] blocksPerHeader, long[] blockSizes)
+        {
+            IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
+            IEnumerable<FileChunk> chunks = this.BuildChunks(headers, true);
+            ChunkWriter writer = new ChunkWriter(chunks);
+        }
+
+        [Theory]
+        [InlineData(20, new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 })]
+        [InlineData(20, new long[] { 2, 1, 3 }, new long[] { 5, 5, 0, 10, 5, 5 })]
+        public async Task ChunkReaderReads(int numAttempts, long[] blocksPerHeader, long[] blockSizes)
+        {
+            IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
+            IList<FileChunk> myChunks = this.BuildChunks(headers, false);
+            ChunkReader reader = new ChunkReader(myChunks);
+            Assert.Equal(reader.NumChunks, myChunks.LongCount());
+            Random r = new Random();
+            for (int i = 0; i < numAttempts; ++i)
+            {
+                int id = r.Next((int)reader.NumChunks);
+                FileSegment seg = await reader.ReadChunk(id);
+                Assert.Equal(id, seg.SegmentId);
+                for (int j = 0; j < seg.Data.Length; ++j)
+                {
+                    Assert.Equal(seg.Data[j], (byte)((myChunks[id].Block.Offset + j) & 0xFF));
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData(20, new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 })]
+        [InlineData(20, new long[] { 2, 1, 3 }, new long[] { 5, 5, 0, 10, 5, 5 })]
+        public async Task ChunkWriterWrites(int numAttempts, long[] blocksPerHeader, long[] blockSizes)
+        {
+            IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
+            IList<FileChunk> myChunks = this.BuildChunks(headers, true);
+            ChunkWriter writer = new ChunkWriter(myChunks);
+            Random r = new Random();
+            for (int i = 0; i < numAttempts; ++i)
+            {
+                int id = r.Next(myChunks.Count);
+                FileSegment seg = new FileSegment();
+                seg.SegmentId = id;
+                seg.Data = new byte[myChunks[id].Block.Length];
+                long origLength = myChunks[id].Stream.Length;
+                r.NextBytes(seg.Data);
+                await writer.WriteChunk(seg);
+                myChunks[id].Stream.Seek(myChunks[id].Block.Offset, IO.SeekOrigin.Begin);
+                byte[] buf = new byte[myChunks[id].Block.Length];
+                await myChunks[id].Stream.ReadAsync(buf, 0, buf.Length);
+                Assert.True(seg.Data.SequenceEqual(buf));
+                Assert.InRange(myChunks[id].Stream.Length, 0, myChunks[id].Header.Length);
+            }
         }
 
         private IEnumerable<FileHeader> BuildHeaders(long[] blocksPerHeader, long[] blockSizes)
@@ -45,6 +102,7 @@ namespace MS.MulticastDownloader.Tests.IO
                     blockRange.Length = blockSizes[k];
                     offset += blockRange.Length;
                     ++k;
+                    blocks.Add(blockRange);
                 }
 
                 header.Blocks = blocks.ToArray();
@@ -52,8 +110,9 @@ namespace MS.MulticastDownloader.Tests.IO
             }
         }
 
-        private IEnumerable<FileChunk> BuildChunks(IEnumerable<FileHeader> headers, bool openWrite)
+        private IList<FileChunk> BuildChunks(IEnumerable<FileHeader> headers, bool openWrite)
         {
+            List<FileChunk> ret = new List<FileChunk>();
             foreach (FileHeader header in headers)
             {
                 IO.Stream s;
@@ -74,9 +133,11 @@ namespace MS.MulticastDownloader.Tests.IO
 
                 foreach (FileBlockRange blockRange in header.Blocks)
                 {
-                    yield return new FileChunk(s, header, blockRange);
+                    ret.Add(new FileChunk(s, header, blockRange));
                 }
             }
+
+            return ret;
         }
     }
 }

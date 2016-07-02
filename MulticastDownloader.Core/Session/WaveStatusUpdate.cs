@@ -13,9 +13,5 @@ namespace MS.MulticastDownloader.Core.Session
         // The bit-vector mask of file sequences id's that the client has.
         [ProtoMember(1)]
         internal byte[] FileBitVector { get; set; }
-
-        // True if departing session
-        [ProtoMember(2)]
-        internal bool LeavingSession { get; set; }
     }
 }

@@ -10,6 +10,9 @@ namespace MS.MulticastDownloader.Core.Session
     [ProtoInclude(1, typeof(WaveStatusUpdate))]
     internal class PacketStatusUpdate
     {
+        [ProtoMember(1)]
+        internal bool LeavingSession { get; set; }
+
         [ProtoMember(2)]
         internal long SegmentsLeft { get; set; }
     }

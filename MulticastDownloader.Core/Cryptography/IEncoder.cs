@@ -9,6 +9,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
     /// <summary>
     /// Represent a cryptographic secret.
     /// </summary>
+    /// <remarks>The encoder is used to encrypt file data as it is being transmitted, as well as to authorize clients to receive files in a multicast session.</remarks>
     public interface IEncoder
     {
         /// <summary>

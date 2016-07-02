@@ -89,6 +89,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to TCP client not initialized..
+        /// </summary>
+        internal static string ClientNotInitialized {
+            get {
+                return ResourceManager.GetString("ClientNotInitialized", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Duplicate file entry in table..
         /// </summary>
         internal static string DuplicateFile {
@@ -103,6 +112,24 @@ namespace MS.MulticastDownloader.Core.Properties {
         internal static string FileNotFound {
             get {
                 return ResourceManager.GetString("FileNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid encoder object..
+        /// </summary>
+        internal static string InvalidEncoder {
+            get {
+                return ResourceManager.GetString("InvalidEncoder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid URI scheme..
+        /// </summary>
+        internal static string InvalidUriScheme {
+            get {
+                return ResourceManager.GetString("InvalidUriScheme", resourceCulture);
             }
         }
         
