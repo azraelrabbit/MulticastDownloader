@@ -19,20 +19,35 @@ namespace MS.MulticastDownloader.Core.IO
     using Sockets.Plugin.Abstractions;
 
     // Represent a wrapper around client connection state.
-    internal class ClientConnection : ConnectionBase
+    internal class ClientConnection : SessionConnectionBase
     {
-        private const int MulticastBufferSize = 1 << 20;
-
         private ILog log = LogManager.GetLogger<ClientConnection>();
+        private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
+        private int bufferUse = 0;
         private ConcurrentQueue<byte[]> multicastPackets = new ConcurrentQueue<byte[]>();
         private AutoResetEvent packetQueuedEvent = new AutoResetEvent(false);
-        private int multicastBufferSize = 0;
-        private bool listening;
+        private bool tcpListen;
+        private bool udpListen;
         private bool disposed;
 
-        internal ClientConnection(UriParameters parms, IEncoder encoder, int ttl)
-            : base(parms, encoder, ttl)
+        internal ClientConnection(UriParameters parms, IMulticastSettings settings)
+            : base(parms, settings)
         {
+        }
+
+        internal UdpSocketMulticastClient MulticastClient
+        {
+            get
+            {
+                return this.multicastClient;
+            }
+        }
+
+        internal async Task InitMulticastClient(string interfaceName, string multicastAddress, int port)
+        {
+            this.udpListen = true;
+            this.multicastClient.TTL = this.Settings.Ttl;
+            await this.multicastClient.JoinMulticastGroupAsync(multicastAddress, port);
         }
 
         internal async Task InitTcpClient()
@@ -46,16 +61,21 @@ namespace MS.MulticastDownloader.Core.IO
         internal void InitReceiveMulticast()
         {
             this.log.DebugFormat("Receiving multicast data");
-            this.listening = true;
+            this.tcpListen = true;
             this.MulticastClient.MessageReceived += this.MulticastPacketReceived;
         }
 
         internal override async Task Close()
         {
             await base.Close();
-            if (this.listening)
+            if (this.tcpListen)
             {
                 this.MulticastClient.MessageReceived -= this.MulticastPacketReceived;
+            }
+
+            if (this.udpListen)
+            {
+                await this.multicastClient.DisconnectAsync();
             }
         }
 
@@ -63,25 +83,26 @@ namespace MS.MulticastDownloader.Core.IO
         {
             Task<List<T>> t0 = Task.Run(() =>
             {
-                    this.packetQueuedEvent.WaitOne();
-                    List<T> ret = new List<T>();
-                    byte[] next;
-                    while (this.multicastPackets.TryDequeue(out next))
+                IEncoder encoder = this.Settings.Encoder;
+                this.packetQueuedEvent.WaitOne();
+                List<T> ret = new List<T>();
+                byte[] next;
+                while (this.multicastPackets.TryDequeue(out next))
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (encoder != null)
                     {
-                        token.ThrowIfCancellationRequested();
-                        if (this.Encoder != null)
-                        {
-                            next = this.Encoder.Decode(next);
-                        }
-
-                        using (MemoryStream ms = new MemoryStream(next))
-                        {
-                            T val = Serializer.Deserialize<T>(ms);
-                            ret.Add(val);
-                        }
+                        next = encoder.Decode(next);
                     }
 
-                    return ret;
+                    using (MemoryStream ms = new MemoryStream(next))
+                    {
+                        T val = Serializer.Deserialize<T>(ms);
+                        ret.Add(val);
+                    }
+                }
+
+                return ret;
             });
 
             return await t0.WaitWithCancellation(token);
@@ -109,7 +130,7 @@ namespace MS.MulticastDownloader.Core.IO
 
         private void MulticastPacketReceived(object sender, UdpSocketMessageReceivedEventArgs args)
         {
-            while (this.multicastBufferSize - args.ByteData.Length > MulticastBufferSize)
+            while (this.bufferUse + args.ByteData.Length > this.Settings.MulticastBufferSize)
             {
                 byte[] unused;
                 this.multicastPackets.TryDequeue(out unused);

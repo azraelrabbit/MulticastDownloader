@@ -10,6 +10,7 @@ namespace MS.MulticastDownloader.Core.Session
 
     [ProtoContract]
     [ProtoInclude(1, typeof(SessionJoinResponse))]
+    [ProtoInclude(2, typeof(WaveCompleteResponse))]
     internal class Response
     {
         [ProtoMember(1)]

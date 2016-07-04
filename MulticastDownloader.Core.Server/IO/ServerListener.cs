@@ -16,72 +16,48 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class ServerListener : IDisposable
+    internal class ServerListener : ServerConnectionBase
     {
-        private const int MaxConnections = 1 << 12;
         private ILog log = LogManager.GetLogger<ServerListener>();
         private TcpSocketListener listener = new TcpSocketListener();
         private AutoResetEvent clientConnectedEvent = new AutoResetEvent(false);
         private ConcurrentQueue<ITcpSocketClient> connections = new ConcurrentQueue<ITcpSocketClient>();
-        private bool listening;
+        private bool tcpListen;
         private bool disposed;
 
-        internal ServerListener(UriParameters parms, IEncoder encoder, int ttl, int mtu)
+        internal ServerListener(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+            : base(parms, settings, serverSettings)
         {
-            Contract.Requires(parms != null);
-            Contract.Requires(encoder != null);
-            Contract.Requires(ttl > 0);
-            Contract.Requires(ttl >= 576);
-            this.UriParameters = parms;
-            this.Encoder = encoder;
-            this.Ttl = ttl;
-            this.Mtu = mtu;
         }
 
-        internal UriParameters UriParameters
+        internal TcpSocketListener Listener
         {
-            get;
-            private set;
-        }
-
-        internal int Ttl
-        {
-            get;
-            private set;
-        }
-
-        internal int Mtu
-        {
-            get;
-            private set;
-        }
-
-        internal IEncoder Encoder
-        {
-            get;
-            private set;
-        }
-
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        public void Dispose()
-        {
-            this.Dispose(true);
+            get
+            {
+                return this.listener;
+            }
         }
 
         internal async Task InitServerListener()
         {
-            this.log.DebugFormat("Listening on {0}", this.UriParameters);
-            await this.listener.StartListeningAsync(this.UriParameters.Port);
-            this.listening = true;
+            ICommsInterface commsInterface = await this.GetCommsInterface();
+            this.log.DebugFormat("Listening on {0}, if={1}", this.UriParameters, commsInterface != null ? commsInterface.Name : string.Empty);
+            await this.listener.StartListeningAsync(this.UriParameters.Port, commsInterface);
+            this.tcpListen = true;
             this.listener.ConnectionReceived += this.SocketConnectionRecieved;
         }
 
-        internal async Task Close()
+        internal async Task<ServerUdpBroadcaster> CreateBroadcaster(string multicastAddress, int sessionId)
+        {
+            ServerUdpBroadcaster broadcaster = new ServerUdpBroadcaster(this.UriParameters, this.Settings, this.ServerSettings);
+            await broadcaster.InitMulticastServer(multicastAddress, this.ServerSettings.MulticastStartPort + sessionId);
+            return broadcaster;
+        }
+
+        internal override async Task Close()
         {
             this.log.DebugFormat("Closing server listener...");
-            if (this.listening)
+            if (this.tcpListen)
             {
                 this.listener.ConnectionReceived -= this.SocketConnectionRecieved;
                 await this.listener.StopListeningAsync();
@@ -99,7 +75,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 {
                     token.ThrowIfCancellationRequested();
                     this.log.DebugFormat("Accepting connection from {0}:{1}", client.RemoteAddress, client.RemotePort);
-                    ret.Add(new ServerConnection(this.UriParameters, this.Encoder, client, this.Ttl, this.Mtu));
+                    ret.Add(new ServerConnection(this.UriParameters, this.Settings, client));
                 }
 
                 return ret;
@@ -112,8 +88,9 @@ namespace MS.MulticastDownloader.Core.Server.IO
         /// Releases unmanaged and - optionally - managed resources.
         /// </summary>
         /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
-        protected virtual void Dispose(bool disposing)
+        protected override void Dispose(bool disposing)
         {
+            base.Dispose(disposing);
             if (!this.disposed)
             {
                 this.disposed = true;
@@ -140,7 +117,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
         private void SocketConnectionRecieved(object sender, TcpSocketListenerConnectEventArgs eventArgs)
         {
-            while (this.connections.Count >= MaxConnections)
+            while (this.connections.Count >= this.ServerSettings.MaxPendingConnections)
             {
                 ITcpSocketClient client;
                 if (this.connections.TryDequeue(out client))

@@ -64,7 +64,11 @@
     <Compile Include="IO\ClientConnection.cs" />
     <Compile Include="IO\ConnectionBase.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
+    <Compile Include="IO\SessionConnectionBase.cs" />
     <Compile Include="IO\TaskExtensionMethods.cs" />
+    <Compile Include="IMulticastSettings.cs" />
+    <Compile Include="Session\WaveCompleteResponse.cs" />
+    <Compile Include="Session\WaveStatusUpdateRequest.cs" />
     <Compile Include="UriParameters.cs" />
     <Compile Include="MulticastClient.cs" />
     <Compile Include="NamespaceDoc.cs" />

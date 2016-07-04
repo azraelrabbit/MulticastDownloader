@@ -18,21 +18,13 @@ namespace MS.MulticastDownloader.Core.IO
 
     internal class ConnectionBase : IDisposable
     {
-        private static readonly int SessionTimeout = (int)TimeSpan.FromMinutes(10).TotalMilliseconds;
         private ILog log = LogManager.GetLogger<ConnectionBase>();
-        private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
-        private bool tcpListen;
-        private bool udpListen;
-        private bool disposed;
 
-        internal ConnectionBase(UriParameters parms, IEncoder encoder, int ttl)
+        internal ConnectionBase(UriParameters parms, IMulticastSettings settings)
         {
-            Contract.Requires(parms != null);
-            Contract.Requires(encoder != null);
-            Contract.Requires(ttl > 0);
+            Contract.Requires(parms != null && settings != null);
             this.UriParameters = parms;
-            this.Encoder = encoder;
-            this.Ttl = ttl;
+            this.Settings = settings;
         }
 
         internal UriParameters UriParameters
@@ -41,27 +33,7 @@ namespace MS.MulticastDownloader.Core.IO
             private set;
         }
 
-        internal int Ttl
-        {
-            get;
-            private set;
-        }
-
-        internal UdpSocketMulticastClient MulticastClient
-        {
-            get
-            {
-                return this.multicastClient;
-            }
-        }
-
-        internal IEncoder Encoder
-        {
-            get;
-            private set;
-        }
-
-        internal ITcpSocketClient TcpSession
+        internal IMulticastSettings Settings
         {
             get;
             private set;
@@ -75,60 +47,9 @@ namespace MS.MulticastDownloader.Core.IO
             this.Dispose(true);
         }
 
-        internal void SetTcpSession(ITcpSocketClient client)
+        internal virtual Task Close()
         {
-            Contract.Requires(client != null);
-            this.tcpListen = true;
-            this.TcpSession = client;
-            this.TcpSession.ReadStream.ReadTimeout = SessionTimeout;
-            this.TcpSession.WriteStream.WriteTimeout = SessionTimeout;
-        }
-
-        internal async Task InitMulticastClient(string localAddress, string multicastAddress, int port)
-        {
-            this.udpListen = true;
-            this.multicastClient.TTL = this.Ttl;
-            await this.multicastClient.JoinMulticastGroupAsync(multicastAddress, port);
-        }
-
-        internal virtual async Task Close()
-        {
-            this.log.Debug("Closing connection");
-            if (this.tcpListen)
-            {
-                await this.TcpSession.DisconnectAsync();
-            }
-
-            if (this.udpListen)
-            {
-                await this.multicastClient.DisconnectAsync();
-            }
-        }
-
-        internal async Task SendSession<T>(T data, CancellationToken token)
-            where T : class
-        {
-            Contract.Requires(this.TcpSession != null);
-            Contract.Requires(data != null);
-            Task<bool> t0 = Task.Run(() =>
-            {
-                Serializer.SerializeWithLengthPrefix(this.TcpSession.WriteStream, data, PrefixStyle.Fixed32);
-                return true;
-            });
-
-            await t0.WaitWithCancellation(token);
-        }
-
-        internal async Task<T> ReceiveSession<T>(CancellationToken token)
-            where T : class
-        {
-            Contract.Requires(this.TcpSession != null);
-            Task<T> t0 = Task.Run(() =>
-            {
-                return Serializer.DeserializeWithLengthPrefix<T>(this.TcpSession.ReadStream, PrefixStyle.Fixed32);
-            });
-
-            return await t0.WaitWithCancellation(token);
+            return Task.Run(() => this.log.DebugFormat("{0}: Closing connection...", this.GetType()));
         }
 
         /// <summary>
@@ -137,19 +58,6 @@ namespace MS.MulticastDownloader.Core.IO
         /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (!this.disposed)
-            {
-                this.disposed = true;
-                if (this.TcpSession != null)
-                {
-                    this.TcpSession.Dispose();
-                }
-
-                if (this.multicastClient != null)
-                {
-                    this.multicastClient.Dispose();
-                }
-            }
         }
     }
 }
