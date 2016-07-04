@@ -22,55 +22,9 @@ namespace MS.MulticastDownloader.Core.Cryptography
         private BufferedAsymmetricBlockCipher encoder;
         private BufferedAsymmetricBlockCipher decoder;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AsymmetricEncoder"/> class.
-        /// </summary>
-        /// <param name="certData">The cert data.</param>
-        /// <param name="flags">The flags.</param>
-        public AsymmetricEncoder(Stream certData, AsymmetricSecretFlags flags)
+        internal AsymmetricEncoder(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
         {
-            this.Init(certData, flags, null);
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AsymmetricEncoder"/> class.
-        /// </summary>
-        /// <param name="certData">The cert data.</param>
-        /// <param name="flags">The cert flags.</param>
-        /// <param name="passwordFinder">The password finder.</param>
-        public AsymmetricEncoder(Stream certData, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
-        {
-            this.Init(certData, flags, passwordFinder);
-        }
-
-        /// <summary>
-        /// Loads the specified cert data.
-        /// </summary>
-        /// <param name="folder">The cert folder.</param>
-        /// <param name="certData">The cert data.</param>
-        /// <param name="flags">The flags.</param>
-        /// <returns>An <see cref="AsymmetricEncoder"/>.</returns>
-        public static async Task<AsymmetricEncoder> Load(IFolder folder, string certData, AsymmetricSecretFlags flags)
-        {
-            return await Load(folder, certData, flags, null);
-        }
-
-        /// <summary>
-        /// Loads the specified cert data.
-        /// </summary>
-        /// <param name="folder">The cert folder.</param>
-        /// <param name="certData">The cert data.</param>
-        /// <param name="flags">The cert flags.</param>
-        /// <param name="passwordFinder">The password finder.</param>
-        /// <returns>An <see cref="AsymmetricEncoder"/>.</returns>
-        public static async Task<AsymmetricEncoder> Load(IFolder folder, string certData, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
-        {
-            IFile keyFile = await folder.GetFileAsync(certData);
-            using (Stream certStream = await keyFile.OpenAsync(FileAccess.Read))
-            {
-                AsymmetricEncoder ret = new AsymmetricEncoder(certStream, flags, passwordFinder);
-                return ret;
-            }
+            this.Init(keyParam, flags, passwordFinder);
         }
 
         /// <summary>
@@ -113,46 +67,8 @@ namespace MS.MulticastDownloader.Core.Cryptography
             return this.decoder.Process(encoded);
         }
 
-        private void Init(Stream certData, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
+        private void Init(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
         {
-            PemReader reader;
-            if (passwordFinder == null)
-            {
-                reader = new PemReader(new StreamReader(certData));
-            }
-            else
-            {
-                reader = new PemReader(new StreamReader(certData), passwordFinder);
-            }
-
-            object obj = reader.ReadObject();
-            AsymmetricKeyParameter keyParam;
-            if (obj is AsymmetricKeyParameter)
-            {
-                keyParam = (AsymmetricKeyParameter)obj;
-            }
-            else if (obj is AsymmetricCipherKeyPair)
-            {
-                AsymmetricCipherKeyPair cipherPair = (AsymmetricCipherKeyPair)obj;
-                if (flags.HasFlag(AsymmetricSecretFlags.ReadPrivateKey))
-                {
-                    keyParam = cipherPair.Private;
-                }
-                else
-                {
-                    keyParam = cipherPair.Public;
-                }
-            }
-            else
-            {
-                throw new InvalidOperationException(Resources.CertificateTypeMismatch);
-            }
-
-            if (flags.HasFlag(AsymmetricSecretFlags.ReadPrivateKey) != keyParam.IsPrivate)
-            {
-                throw new InvalidOperationException(Resources.CertificateDoesNotContainPrivateKey);
-            }
-
             this.encoder = new BufferedAsymmetricBlockCipher(new RsaEngine());
             this.decoder = new BufferedAsymmetricBlockCipher(new RsaEngine());
             this.encoder.Init(true, keyParam);

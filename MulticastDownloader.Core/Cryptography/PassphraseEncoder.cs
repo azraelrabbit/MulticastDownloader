@@ -22,13 +22,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         private BufferedBlockCipher encoder;
         private BufferedBlockCipher decoder;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="PassphraseEncoder"/> class.
-        /// </summary>
-        /// <param name="passPhrase">The passphrase.</param>
-        /// <param name="enc">The encoding.</param>
-        /// <param name="blockBits">The desired encoding length in bits.</param>
-        public PassphraseEncoder(string passPhrase, Encoding enc, int blockBits)
+        internal PassphraseEncoder(string passPhrase, Encoding enc, int blockBits)
         {
             if (string.IsNullOrEmpty(passPhrase))
             {
@@ -56,25 +50,13 @@ namespace MS.MulticastDownloader.Core.Cryptography
             this.decoder.Init(false, this.cipher);
         }
 
-        /// <summary>
-        /// Gets the passphrase.
-        /// </summary>
-        /// <value>
-        /// The passphrase.
-        /// </value>
-        public string Passphrase
+        internal string Passphrase
         {
             get;
             private set;
         }
 
-        /// <summary>
-        /// Gets the block bits.
-        /// </summary>
-        /// <value>
-        /// The desired encoding length in bits.
-        /// </value>
-        public int Strength
+        internal int Strength
         {
             get;
             private set;

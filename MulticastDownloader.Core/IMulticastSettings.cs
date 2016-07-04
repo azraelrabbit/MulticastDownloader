@@ -23,7 +23,7 @@ namespace MS.MulticastDownloader.Core
         /// <value>
         /// The encoder.
         /// </value>
-        IEncoder Encoder { get; }
+        IEncoderFactory Encoder { get; }
 
         /// <summary>
         /// Gets the TTL (time to live) setting used for multicast data.

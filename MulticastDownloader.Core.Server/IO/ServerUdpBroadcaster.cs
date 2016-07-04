@@ -9,6 +9,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using System.Collections.Generic;
     using System.Diagnostics.Contracts;
     using System.IO;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
@@ -22,6 +23,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
     {
         private ILog log = LogManager.GetLogger<ServerListener>();
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
+        private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool udpListen;
         private bool disposed;
 
@@ -69,14 +71,13 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
-        internal async Task SendMulticast<T>(ICollection<T> data, CancellationToken token)
+        internal async Task SendMulticast<T>(IEnumerable<T> data, CancellationToken token)
         {
             Contract.Requires(data != null);
-            Task t0 = Task.Run(async () =>
+            Task t0 = Task.Run(() =>
             {
-                List<Task> pendingSends = new List<Task>(data.Count);
-                IEncoder encoder = this.Settings.Encoder;
-                foreach (T val in data)
+                IEncoderFactory encoderFactory = this.Settings.Encoder;
+                data.AsParallel().ForAll(async (val) =>
                 {
                     byte[] serialized = new byte[this.BlockSize];
                     using (MemoryStream ms = new MemoryStream(serialized, true))
@@ -84,15 +85,20 @@ namespace MS.MulticastDownloader.Core.Server.IO
                         Serializer.Serialize(ms, val);
                     }
 
-                    if (encoder != null)
+                    if (encoderFactory != null)
                     {
+                        IEncoder encoder;
+                        if (!this.encoders.TryTake(out encoder))
+                        {
+                            encoder = encoderFactory.CreateEncoder();
+                        }
+
                         serialized = encoder.Encode(serialized);
+                        this.encoders.Add(encoder);
                     }
 
-                    pendingSends.Add(this.MulticastClient.SendMulticastAsync(serialized));
-                }
-
-                await Task.WhenAll(pendingSends);
+                    await this.multicastClient.SendMulticastAsync(serialized);
+                });
             });
 
             await t0.WaitWithCancellation(token);

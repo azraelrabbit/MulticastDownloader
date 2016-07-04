@@ -34,8 +34,9 @@ namespace MS.MulticastDownloader.Core.Server.IO
             this.blockSize = this.ServerSettings.Mtu - UdpOverhead - (this.ServerSettings.Ipv6 ? Ipv6Overhead : Ipv4Overhead);
             if (this.Settings.Encoder != null)
             {
+                IEncoder encoder = this.Settings.Encoder.CreateEncoder();
                 int unencodedSize = this.blockSize;
-                while (this.Settings.Encoder.GetEncodedOutputLength(unencodedSize) > this.blockSize)
+                while (encoder.GetEncodedOutputLength(unencodedSize) > this.blockSize)
                 {
                     --unencodedSize;
                 }

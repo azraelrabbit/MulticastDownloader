@@ -53,13 +53,16 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Cryptography\AsymmetricEncoderFactory.cs" />
     <Compile Include="Cryptography\AsymmetricSecretFlags.cs" />
     <Compile Include="Cryptography\BufferedCipherBaseExtensions.cs" />
     <Compile Include="Cryptography\IEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricKeyPairWriter.cs" />
+    <Compile Include="Cryptography\IEncoderFactory.cs" />
     <Compile Include="Cryptography\NamespaceDoc.cs" />
     <Compile Include="Cryptography\PassphraseEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricEncoder.cs" />
+    <Compile Include="Cryptography\PassphraseEncoderFactory.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
     <Compile Include="IO\ConnectionBase.cs" />

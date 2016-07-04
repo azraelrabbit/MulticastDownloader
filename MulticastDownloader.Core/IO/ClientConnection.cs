@@ -7,9 +7,8 @@ namespace MS.MulticastDownloader.Core.IO
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using System.Diagnostics.Contracts;
     using System.IO;
-    using System.Net;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
@@ -25,6 +24,7 @@ namespace MS.MulticastDownloader.Core.IO
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
         private int bufferUse = 0;
         private ConcurrentQueue<byte[]> multicastPackets = new ConcurrentQueue<byte[]>();
+        private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private AutoResetEvent packetQueuedEvent = new AutoResetEvent(false);
         private bool tcpListen;
         private bool udpListen;
@@ -83,25 +83,43 @@ namespace MS.MulticastDownloader.Core.IO
         {
             Task<List<T>> t0 = Task.Run(() =>
             {
-                IEncoder encoder = this.Settings.Encoder;
+                int received = 0;
+                int bufferSize = this.Settings.MulticastBufferSize;
+                IEncoderFactory encoderFactory = this.Settings.Encoder;
+                List<byte[]> pendingDeserializes = new List<byte[]>(this.multicastPackets.Count);
                 this.packetQueuedEvent.WaitOne();
-                List<T> ret = new List<T>();
                 byte[] next;
                 while (this.multicastPackets.TryDequeue(out next))
                 {
                     token.ThrowIfCancellationRequested();
-                    if (encoder != null)
+                    pendingDeserializes.Add(next);
+                    received += next.Length;
+                    if (received >= bufferSize)
                     {
+                        break;
+                    }
+                }
+
+                List<T> ret = pendingDeserializes.AsParallel().Select((d) =>
+                {
+                    if (encoderFactory != null)
+                    {
+                        IEncoder encoder;
+                        if (!this.encoders.TryTake(out encoder))
+                        {
+                            encoder = encoderFactory.CreateEncoder();
+                        }
+
                         next = encoder.Decode(next);
+                        this.encoders.Add(encoder);
                     }
 
                     using (MemoryStream ms = new MemoryStream(next))
                     {
                         T val = Serializer.Deserialize<T>(ms);
-                        ret.Add(val);
+                        return val;
                     }
-                }
-
+                }).ToList();
                 return ret;
             });
 
@@ -136,6 +154,7 @@ namespace MS.MulticastDownloader.Core.IO
                 this.multicastPackets.TryDequeue(out unused);
             }
 
+            this.bufferUse += args.ByteData.Length;
             this.multicastPackets.Enqueue(args.ByteData);
             this.packetQueuedEvent.Set();
         }

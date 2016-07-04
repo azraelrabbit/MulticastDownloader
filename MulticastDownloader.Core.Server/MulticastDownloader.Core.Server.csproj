@@ -60,7 +60,6 @@
     <Compile Include="IO\ServerConnectionBase.cs" />
     <Compile Include="IO\ServerListener.cs" />
     <Compile Include="IO\ServerUdpBroadcaster.cs" />
-    <Compile Include="MulticastHost.cs" />
     <Compile Include="MulticastServer.cs" />
     <Compile Include="NamespaceDoc.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
