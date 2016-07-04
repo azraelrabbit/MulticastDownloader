@@ -65,6 +65,7 @@
     <Compile Include="Cryptography\PassphraseEncoderFactory.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
+    <Compile Include="IO\ClientUdpReader.cs" />
     <Compile Include="IO\ConnectionBase.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
     <Compile Include="IO\SessionConnectionBase.cs" />
