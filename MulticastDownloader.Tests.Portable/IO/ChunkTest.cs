@@ -23,8 +23,9 @@ namespace MS.MulticastDownloader.Tests.IO
         {
             IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
             IEnumerable<FileChunk> chunks = this.BuildChunks(headers, false);
-            ChunkReader reader = new ChunkReader(chunks);
-            Assert.Equal(reader.NumChunks, chunks.LongCount());
+            BitVector vector = new BitVector(chunks.LongCount());
+            ChunkReader reader = new ChunkReader(chunks, vector);
+            Assert.Equal(reader.Count, chunks.LongCount());
         }
 
         [Theory]
@@ -33,27 +34,45 @@ namespace MS.MulticastDownloader.Tests.IO
         {
             IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
             IEnumerable<FileChunk> chunks = this.BuildChunks(headers, true);
-            ChunkWriter writer = new ChunkWriter(chunks);
+            BitVector vector = new BitVector(chunks.LongCount());
+            ChunkWriter writer = new ChunkWriter(chunks, vector);
         }
 
         [Theory]
-        [InlineData(20, new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 })]
-        [InlineData(20, new long[] { 2, 1, 3 }, new long[] { 5, 5, 0, 10, 5, 5 })]
-        public async Task ChunkReaderReads(int numAttempts, long[] blocksPerHeader, long[] blockSizes)
+        [InlineData(20, new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 }, new long[] { })]
+        [InlineData(20, new long[] { 2, 1, 3 }, new long[] { 5, 5, 0, 10, 5, 5 }, new long[] { })]
+        [InlineData(20, new long[] { 1, 2, 3 }, new long[] { 5, 5, 5, 10, 5, 5 }, new long[] { 0, 2 })]
+        public async Task ChunkReaderReads(int numAttempts, long[] blocksPerHeader, long[] blockSizes, long[] readIdxes)
         {
             IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
             IList<FileChunk> myChunks = this.BuildChunks(headers, false);
-            ChunkReader reader = new ChunkReader(myChunks);
-            Assert.Equal(reader.NumChunks, myChunks.LongCount());
-            Random r = new Random();
+            BitVector vector = new BitVector(myChunks.LongCount());
+            foreach (long readIdx in readIdxes)
+            {
+                vector[readIdx] = true;
+            }
+
+            ChunkReader reader = new ChunkReader(myChunks, vector);
+            Assert.Equal(reader.Count, myChunks.LongCount());
+            long lastId = -1;
             for (int i = 0; i < numAttempts; ++i)
             {
-                int id = r.Next((int)reader.NumChunks);
-                FileSegment seg = await reader.ReadChunk(id);
-                Assert.Equal(id, seg.SegmentId);
+                FileSegment seg = (await reader.ReadSegments(1)).FirstOrDefault();
+                if (seg == null)
+                {
+                    // FIXMEFIXME: Validate this is supposed to not return anything.
+                    continue;
+                }
+
+                Assert.False(vector[seg.SegmentId]);
+                if (blockSizes.Length > 1)
+                {
+                    Assert.NotEqual(lastId, seg.SegmentId);
+                }
+
                 for (int j = 0; j < seg.Data.Length; ++j)
                 {
-                    Assert.Equal(seg.Data[j], (byte)((myChunks[id].Block.Offset + j) & 0xFF));
+                    Assert.Equal(seg.Data[j], (byte)((myChunks[(int)seg.SegmentId].Block.Offset + j) & 0xFF));
                 }
             }
         }
@@ -65,7 +84,8 @@ namespace MS.MulticastDownloader.Tests.IO
         {
             IEnumerable<FileHeader> headers = this.BuildHeaders(blocksPerHeader, blockSizes);
             IList<FileChunk> myChunks = this.BuildChunks(headers, true);
-            ChunkWriter writer = new ChunkWriter(myChunks);
+            BitVector vector = new BitVector(myChunks.LongCount());
+            ChunkWriter writer = new ChunkWriter(myChunks, vector);
             Random r = new Random();
             for (int i = 0; i < numAttempts; ++i)
             {
@@ -75,7 +95,9 @@ namespace MS.MulticastDownloader.Tests.IO
                 seg.Data = new byte[myChunks[id].Block.Length];
                 long origLength = myChunks[id].Stream.Length;
                 r.NextBytes(seg.Data);
-                await writer.WriteChunk(seg);
+                await writer.WriteSegments(new FileSegment[] { seg });
+                Assert.True(vector[seg.SegmentId]);
+                vector[seg.SegmentId] = false;
                 myChunks[id].Stream.Seek(myChunks[id].Block.Offset, IO.SeekOrigin.Begin);
                 byte[] buf = new byte[myChunks[id].Block.Length];
                 await myChunks[id].Stream.ReadAsync(buf, 0, buf.Length);

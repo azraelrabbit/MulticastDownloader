@@ -63,6 +63,7 @@
     <Compile Include="Cryptography\PassphraseEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricEncoder.cs" />
     <Compile Include="Cryptography\PassphraseEncoderFactory.cs" />
+    <Compile Include="IO\ChunkBase.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
     <Compile Include="IO\ClientUdpReader.cs" />

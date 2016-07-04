@@ -59,9 +59,9 @@ namespace MS.MulticastDownloader.Core.IO
             }
         }
 
-        internal async Task<ICollection<T>> ReceiveMulticast<T>(CancellationToken token)
+        internal async Task<IEnumerable<T>> ReceiveMulticast<T>(CancellationToken token)
         {
-            Task<List<T>> t0 = Task.Run(() =>
+            Task<IEnumerable<T>> t0 = Task.Run(() =>
             {
                 int received = 0;
                 int bufferSize = this.Settings.MulticastBufferSize;
@@ -80,7 +80,7 @@ namespace MS.MulticastDownloader.Core.IO
                     }
                 }
 
-                List<T> ret = pendingDeserializes.AsParallel().Select((d) =>
+                IEnumerable<T> ret = pendingDeserializes.AsParallel().Select((d) =>
                 {
                     if (encoderFactory != null)
                     {
@@ -99,7 +99,7 @@ namespace MS.MulticastDownloader.Core.IO
                         T val = Serializer.Deserialize<T>(ms);
                         return val;
                     }
-                }).ToList();
+                }).ToArray();
                 return ret;
             });
 
