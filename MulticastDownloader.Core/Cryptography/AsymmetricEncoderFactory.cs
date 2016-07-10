@@ -118,7 +118,18 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// </returns>
         public IEncoder CreateEncoder()
         {
-            return new AsymmetricEncoder(this.keyParam, this.flags, this.passwordFinder);
+            return new AsymmetricEncoder(this.keyParam, this.flags, this.passwordFinder, true);
+        }
+
+        /// <summary>
+        /// Creates the decoder.
+        /// </summary>
+        /// <returns>
+        /// A decoder.
+        /// </returns>
+        public IDecoder CreateDecoder()
+        {
+            return new AsymmetricEncoder(this.keyParam, this.flags, this.passwordFinder, false);
         }
     }
 }

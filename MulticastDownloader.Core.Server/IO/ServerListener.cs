@@ -8,11 +8,18 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics.Contracts;
+    using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
+    using Core.Cryptography;
     using Core.IO;
     using Cryptography;
+    using Org.BouncyCastle.Crypto;
+    using Org.BouncyCastle.Crypto.Tls;
+    using Org.BouncyCastle.Security;
+    using PCLStorage;
+    using Properties;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
@@ -21,13 +28,17 @@ namespace MS.MulticastDownloader.Core.Server.IO
         private ILog log = LogManager.GetLogger<ServerListener>();
         private TcpSocketListener listener = new TcpSocketListener();
         private AutoResetEvent clientConnectedEvent = new AutoResetEvent(false);
-        private ConcurrentQueue<ITcpSocketClient> connections = new ConcurrentQueue<ITcpSocketClient>();
+        private ConcurrentQueue<ServerConnection> connections = new ConcurrentQueue<ServerConnection>();
         private bool tcpListen;
         private bool disposed;
 
         internal ServerListener(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
             : base(parms, settings, serverSettings)
         {
+            if (parms.UseTls && settings.Encoder == null)
+            {
+                throw new ArgumentException(Resources.MustSpecifyKeyFile, "serverSettings");
+            }
         }
 
         internal TcpSocketListener Listener
@@ -38,7 +49,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
-        internal async Task InitServerListener()
+        internal async Task Listen()
         {
             ICommsInterface commsInterface = await this.GetCommsInterface();
             this.log.DebugFormat("Listening on {0}, if={1}", this.UriParameters, commsInterface != null ? commsInterface.Name : string.Empty);
@@ -47,10 +58,10 @@ namespace MS.MulticastDownloader.Core.Server.IO
             this.listener.ConnectionReceived += this.SocketConnectionRecieved;
         }
 
-        internal async Task<ServerUdpBroadcaster> CreateBroadcaster(string multicastAddress, int sessionId)
+        internal async Task<UdpWriter> CreateWriter(int sessionId, IEncoderFactory encoder)
         {
-            ServerUdpBroadcaster broadcaster = new ServerUdpBroadcaster(this.UriParameters, this.Settings, this.ServerSettings);
-            await broadcaster.InitMulticastServer(multicastAddress, this.ServerSettings.MulticastStartPort + sessionId);
+            UdpWriter broadcaster = new UdpWriter(this.UriParameters, this.Settings, this.ServerSettings);
+            await broadcaster.StartMulticastServer(this.ServerSettings.MulticastStartPort + sessionId, encoder);
             return broadcaster;
         }
 
@@ -64,18 +75,18 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
-        internal async Task<ICollection<ServerConnection>> ReceiveListeners(CancellationToken token)
+        internal async Task<ICollection<ServerConnection>> ReceiveConnections(CancellationToken token)
         {
             Task<List<ServerConnection>> t0 = Task.Run(() =>
             {
                 this.clientConnectedEvent.WaitOne();
                 List<ServerConnection> ret = new List<ServerConnection>();
-                ITcpSocketClient client;
-                while (this.connections.TryDequeue(out client))
+                ServerConnection conn;
+                while (this.connections.TryDequeue(out conn))
                 {
                     token.ThrowIfCancellationRequested();
-                    this.log.DebugFormat("Accepting connection from {0}:{1}", client.RemoteAddress, client.RemotePort);
-                    ret.Add(new ServerConnection(this.UriParameters, this.Settings, client));
+                    this.log.DebugFormat("Accepting connection from {0}:{1}", conn.TcpSession.RemoteAddress, conn.TcpSession.RemotePort);
+                    ret.Add(conn);
                 }
 
                 return ret;
@@ -96,20 +107,15 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 this.disposed = true;
                 if (disposing)
                 {
-                    if (this.listener != null)
-                    {
-                        this.listener.Dispose();
-                    }
-
                     if (this.clientConnectedEvent != null)
                     {
                         this.clientConnectedEvent.Dispose();
                     }
 
-                    ITcpSocketClient client;
-                    while (this.connections.TryDequeue(out client))
+                    ServerConnection conn;
+                    while (this.connections.TryDequeue(out conn))
                     {
-                        client.Dispose();
+                        conn.Dispose();
                     }
                 }
             }
@@ -117,17 +123,28 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
         private void SocketConnectionRecieved(object sender, TcpSocketListenerConnectEventArgs eventArgs)
         {
-            while (this.connections.Count >= this.ServerSettings.MaxPendingConnections)
+            while (this.connections.Count >= this.ServerSettings.MaxConnectionsPerSession)
             {
-                ITcpSocketClient client;
-                if (this.connections.TryDequeue(out client))
+                ServerConnection conn;
+                if (this.connections.TryDequeue(out conn))
                 {
-                    client.Dispose();
+                    conn.Dispose();
                 }
             }
 
-            this.connections.Enqueue(eventArgs.SocketClient);
-            this.clientConnectedEvent.Set();
+            try
+            {
+                ITcpSocketClient client = eventArgs.SocketClient;
+                ServerConnection conn = new ServerConnection(this.UriParameters, this.Settings);
+                conn.SetTcpSession(client);
+                this.clientConnectedEvent.Set();
+                this.connections.Enqueue(conn);
+            }
+            catch (GeneralSecurityException gse)
+            {
+                this.log.Error("Authentication failed");
+                this.log.Error(gse);
+            }
         }
     }
 }

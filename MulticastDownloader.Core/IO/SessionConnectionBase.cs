@@ -14,12 +14,16 @@ namespace MS.MulticastDownloader.Core.IO
     using System.Threading.Tasks;
     using Common.Logging;
     using Cryptography;
+    using Org.BouncyCastle.Crypto.Tls;
     using ProtoBuf;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
     internal class SessionConnectionBase : ConnectionBase
     {
+        private Stream tlsStream;
+        private Stream outStream;
+        private Stream inStream;
         private ILog log = LogManager.GetLogger<ClientConnection>();
         private bool tcpListen;
         private bool disposed;
@@ -27,6 +31,28 @@ namespace MS.MulticastDownloader.Core.IO
         internal SessionConnectionBase(UriParameters parms, IMulticastSettings settings)
             : base(parms, settings)
         {
+        }
+
+        internal Stream TlsStream
+        {
+            get
+            {
+                return this.tlsStream;
+            }
+
+            set
+            {
+                this.tlsStream = value;
+                if (this.tlsStream == null)
+                {
+                    this.outStream = this.TcpSession.WriteStream;
+                    this.inStream = this.TcpSession.ReadStream;
+                }
+                else
+                {
+                    this.outStream = this.inStream = this.tlsStream;
+                }
+            }
         }
 
         internal ITcpSocketClient TcpSession
@@ -44,30 +70,40 @@ namespace MS.MulticastDownloader.Core.IO
             }
         }
 
-        internal async Task SendSession<T>(T data, CancellationToken token)
+        internal async Task Send<T>(T data, CancellationToken token)
             where T : class
         {
-            Contract.Requires(this.TcpSession != null);
-            Contract.Requires(data != null);
-            Task<bool> t0 = Task.Run(() =>
+            Contract.Assert(!this.UriParameters.UseTls || this.outStream != this.TcpSession.WriteStream);
+            if (!this.UriParameters.UseTls || this.outStream != this.TcpSession.WriteStream)
             {
-                Serializer.SerializeWithLengthPrefix(this.TcpSession.WriteStream, data, PrefixStyle.Fixed32);
-                return true;
-            });
+                Contract.Requires(this.TcpSession != null);
+                Contract.Requires(data != null);
+                Task<bool> t0 = Task.Run(() =>
+                {
+                    Serializer.SerializeWithLengthPrefix(this.outStream, data, PrefixStyle.Fixed32);
+                    return true;
+                });
 
-            await t0.WaitWithCancellation(token);
+                await t0.WaitWithCancellation(token);
+            }
         }
 
-        internal async Task<T> ReceiveSession<T>(CancellationToken token)
+        internal async Task<T> Receive<T>(CancellationToken token)
             where T : class
         {
-            Contract.Requires(this.TcpSession != null);
-            Task<T> t0 = Task.Run(() =>
+            Contract.Assert(!this.UriParameters.UseTls || this.inStream != this.TcpSession.ReadStream);
+            if (!this.UriParameters.UseTls || this.inStream != this.TcpSession.ReadStream)
             {
-                return Serializer.DeserializeWithLengthPrefix<T>(this.TcpSession.ReadStream, PrefixStyle.Fixed32);
-            });
+                Contract.Requires(this.TcpSession != null);
+                Task<T> t0 = Task.Run(() =>
+                {
+                    return Serializer.DeserializeWithLengthPrefix<T>(this.inStream, PrefixStyle.Fixed32);
+                });
 
-            return await t0.WaitWithCancellation(token);
+                return await t0.WaitWithCancellation(token);
+            }
+
+            return default(T);
         }
 
         internal void SetTcpSession(ITcpSocketClient client)
@@ -77,6 +113,8 @@ namespace MS.MulticastDownloader.Core.IO
             this.TcpSession = client;
             this.TcpSession.ReadStream.ReadTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
             this.TcpSession.WriteStream.WriteTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
+            this.outStream = this.TcpSession.ReadStream;
+            this.inStream = this.TcpSession.WriteStream;
         }
 
         /// <summary>
@@ -92,6 +130,17 @@ namespace MS.MulticastDownloader.Core.IO
                 if (this.TcpSession != null)
                 {
                     this.TcpSession.Dispose();
+                }
+
+                if (this.TlsStream != null)
+                {
+                    try
+                    {
+                        this.TlsStream.Dispose();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                    }
                 }
             }
         }

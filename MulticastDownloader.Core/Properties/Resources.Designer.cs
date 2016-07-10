@@ -116,6 +116,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid certificate file..
+        /// </summary>
+        internal static string InvalidCertificateFile {
+            get {
+                return ResourceManager.GetString("InvalidCertificateFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid encoder object..
         /// </summary>
         internal static string InvalidEncoder {
@@ -125,11 +134,38 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid key file..
+        /// </summary>
+        internal static string InvalidKeyFile {
+            get {
+                return ResourceManager.GetString("InvalidKeyFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Server certificate was invalid..
+        /// </summary>
+        internal static string InvalidServerCertificate {
+            get {
+                return ResourceManager.GetString("InvalidServerCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid URI scheme..
         /// </summary>
         internal static string InvalidUriScheme {
             get {
                 return ResourceManager.GetString("InvalidUriScheme", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify a valid key file when using TLS..
+        /// </summary>
+        internal static string MustSpecifyKeyFile {
+            get {
+                return ResourceManager.GetString("MustSpecifyKeyFile", resourceCulture);
             }
         }
         

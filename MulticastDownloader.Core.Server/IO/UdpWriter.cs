@@ -1,4 +1,4 @@
-﻿// <copyright file="ServerUdpBroadcaster.cs" company="MS">
+﻿// <copyright file="UdpWriter.cs" company="MS">
 // Copyright (c) 2016 MS.
 // </copyright>
 
@@ -13,23 +13,32 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
+    using Core.Cryptography;
     using Core.IO;
+    using Core.Session;
     using Cryptography;
     using ProtoBuf;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class ServerUdpBroadcaster : ServerConnectionBase
+    internal class UdpWriter : ServerConnectionBase
     {
         private ILog log = LogManager.GetLogger<ServerListener>();
+        private IEncoderFactory encoder;
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
         private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool udpListen;
         private bool disposed;
 
-        internal ServerUdpBroadcaster(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+        internal UdpWriter(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
             : base(parms, settings, serverSettings)
         {
+        }
+
+        internal int BlockSize
+        {
+            get;
+            private set;
         }
 
         internal string ServerAddress
@@ -52,14 +61,28 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
-        internal async Task InitMulticastServer(string serverAddress, int port)
+        internal async Task StartMulticastServer(int port, IEncoderFactory encoderFactory)
         {
-            Contract.Requires(!string.IsNullOrEmpty(serverAddress));
             Contract.Requires(port > 0 && port >= this.ServerSettings.MulticastStartPort && port < this.ServerSettings.MulticastStartPort + this.ServerSettings.MaxSessions);
+            this.BlockSize = SessionJoinResponse.GetBlockSize(this.ServerSettings.Mtu, this.ServerSettings.Ipv6);
+            if (encoderFactory != null)
+            {
+                this.encoder = encoderFactory;
+                IEncoder encoder = encoderFactory.CreateEncoder();
+                int unencodedSize = this.BlockSize;
+                while (encoder.GetEncodedOutputLength(unencodedSize) > this.BlockSize)
+                {
+                    --unencodedSize;
+                }
+
+                Contract.Assert(unencodedSize > 0);
+                this.BlockSize = unencodedSize;
+            }
+
             this.udpListen = true;
             ICommsInterface commsInterface = await this.GetCommsInterface();
-            this.log.DebugFormat("Initializing multicast session on {0}:{1}, if={2}", serverAddress, port, commsInterface != null ? commsInterface.Name : string.Empty);
-            await this.multicastClient.JoinMulticastGroupAsync(serverAddress, port, commsInterface);
+            this.log.DebugFormat("Initializing multicast session on {0}:{1}, if={2}", this.ServerSettings.MulticastAddress, port, commsInterface != null ? commsInterface.Name : string.Empty);
+            await this.multicastClient.JoinMulticastGroupAsync(this.ServerSettings.MulticastAddress, port, commsInterface);
         }
 
         internal override async Task Close()
@@ -76,7 +99,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
             Contract.Requires(data != null);
             Task t0 = Task.Run(() =>
             {
-                IEncoderFactory encoderFactory = this.Settings.Encoder;
+                IEncoderFactory encoderFactory = this.encoder;
                 data.AsParallel().ForAll(async (val) =>
                 {
                     byte[] serialized = new byte[this.BlockSize];

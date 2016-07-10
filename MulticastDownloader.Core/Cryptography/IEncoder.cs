@@ -25,12 +25,5 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <param name="unencoded">The unencoded data.</param>
         /// <returns>A byte array.</returns>
         byte[] Encode(byte[] unencoded);
-
-        /// <summary>
-        /// Decodes the specified encoded.
-        /// </summary>
-        /// <param name="encoded">The encoded data.</param>
-        /// <returns>A byte array.</returns>
-        byte[] Decode(byte[] encoded);
     }
 }

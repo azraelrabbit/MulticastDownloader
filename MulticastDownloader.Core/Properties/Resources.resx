@@ -135,11 +135,23 @@
   <data name="FileNotFound" xml:space="preserve">
     <value>File not found.</value>
   </data>
+  <data name="InvalidCertificateFile" xml:space="preserve">
+    <value>Invalid certificate file.</value>
+  </data>
   <data name="InvalidEncoder" xml:space="preserve">
     <value>Invalid encoder object.</value>
   </data>
+  <data name="InvalidKeyFile" xml:space="preserve">
+    <value>Invalid key file.</value>
+  </data>
+  <data name="InvalidServerCertificate" xml:space="preserve">
+    <value>Server certificate was invalid.</value>
+  </data>
   <data name="InvalidUriScheme" xml:space="preserve">
     <value>Invalid URI scheme.</value>
+  </data>
+  <data name="MustSpecifyKeyFile" xml:space="preserve">
+    <value>Must specify a valid key file when using TLS.</value>
   </data>
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>

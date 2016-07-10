@@ -4,6 +4,8 @@
 
 namespace MS.MulticastDownloader.Core.Server
 {
+    using Org.BouncyCastle.OpenSsl;
+    using Org.BouncyCastle.X509;
     using PCLStorage;
 
     /// <summary>
@@ -41,7 +43,7 @@ namespace MS.MulticastDownloader.Core.Server
         /// <value>
         /// The maximum number of pending connections.
         /// </value>
-        int MaxPendingConnections { get; }
+        int MaxConnectionsPerSession { get; }
 
         /// <summary>
         /// Gets the multicast address, which is used to broadcast messages from.
@@ -97,14 +99,6 @@ namespace MS.MulticastDownloader.Core.Server
         /// The maximum sessions.
         /// </value>
         int MaxSessions { get; }
-
-        /// <summary>
-        /// Gets the maximum number of client connections per session.
-        /// </summary>
-        /// <value>
-        /// The maximum connections per session.
-        /// </value>
-        int MaxConnectionsPerSession { get; }
 
         /// <summary>
         /// Gets the multicast root folder.

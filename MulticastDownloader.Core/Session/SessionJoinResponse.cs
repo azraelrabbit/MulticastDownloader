@@ -10,6 +10,10 @@ namespace MS.MulticastDownloader.Core.Session
     [ProtoContract]
     internal class SessionJoinResponse : Response
     {
+        private const int Ipv6Overhead = 40;
+        private const int Ipv4Overhead = 20;
+        private const int UdpOverhead = 8;
+
         [ProtoMember(1)]
         internal string MulticastAddress { get; set; }
 
@@ -17,6 +21,15 @@ namespace MS.MulticastDownloader.Core.Session
         internal int MulticastPort { get; set; }
 
         [ProtoMember(3)]
+        internal bool Ipv6 { get; set; }
+
+        [ProtoMember(4)]
+        internal int Mtu { get; set; }
+
+        [ProtoMember(5)]
+        internal int MulticastBurstLength { get; set; }
+
+        [ProtoMember(6)]
         internal FileHeader[] Files { get; set; }
 
         internal long CountSegments
@@ -39,6 +52,12 @@ namespace MS.MulticastDownloader.Core.Session
 
                 return 0;
             }
+        }
+
+        // The maximum size of the encoded data in individual blocks being transmitted.
+        internal static int GetBlockSize(int mtu, bool ipv6)
+        {
+            return mtu - UdpOverhead - (ipv6 ? Ipv6Overhead : Ipv4Overhead);
         }
     }
 }

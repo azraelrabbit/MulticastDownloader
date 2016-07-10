@@ -12,13 +12,13 @@ namespace MS.MulticastDownloader.Core.IO
     {
         internal static async Task<T> WaitWithCancellation<T>(this Task<T> t0, CancellationToken token)
         {
-            await WaitWithCancellation(t0, token);
+            await WaitWithCancellationInternal(t0, token);
             return await t0;
         }
 
         internal static async Task WaitWithCancellation(this Task t0, CancellationToken token)
         {
-            await WaitWithCancellation(t0, token);
+            await WaitWithCancellationInternal(t0, token);
             await t0;
         }
 

@@ -16,20 +16,18 @@ namespace MS.MulticastDownloader.Core.Cryptography
     {
         private string passPhrase;
         private Encoding encoding;
-        private int blockBits;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PassphraseEncoderFactory"/> class.
         /// </summary>
         /// <param name="passPhrase">The pass phrase.</param>
         /// <param name="enc">The enc.</param>
-        /// <param name="blockBits">The block bits.</param>
         /// <exception cref="System.ArgumentException">
         /// passPhrase
         /// or
         /// </exception>
         /// <exception cref="System.ArgumentNullException">enc</exception>
-        public PassphraseEncoderFactory(string passPhrase, Encoding enc, int blockBits)
+        public PassphraseEncoderFactory(string passPhrase, Encoding enc)
         {
             if (string.IsNullOrEmpty(passPhrase))
             {
@@ -41,14 +39,8 @@ namespace MS.MulticastDownloader.Core.Cryptography
                 throw new ArgumentNullException("enc");
             }
 
-            if (blockBits % 8 != 0)
-            {
-                throw new ArgumentException(Resources.BlockSizeMustBeMultipleOf8);
-            }
-
             this.passPhrase = passPhrase;
             this.encoding = enc;
-            this.blockBits = blockBits;
         }
 
         /// <summary>
@@ -59,7 +51,18 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// </returns>
         public IEncoder CreateEncoder()
         {
-            return new PassphraseEncoder(this.passPhrase, this.encoding, this.blockBits);
+            return new PassphraseEncoder(this.passPhrase, this.encoding, 256, true);
+        }
+
+        /// <summary>
+        /// Creates the decoder.
+        /// </summary>
+        /// <returns>
+        /// A decoder.
+        /// </returns>
+        public IDecoder CreateDecoder()
+        {
+            return new PassphraseEncoder(this.passPhrase, this.encoding, 256, false);
         }
     }
 }

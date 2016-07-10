@@ -1,4 +1,4 @@
-﻿// <copyright file="AsymmetricKeyPairWriter.cs" company="MS">
+﻿// <copyright file="SecretWriter.cs" company="MS">
 // Copyright (c) 2016 MS.
 // </copyright>
 
@@ -8,16 +8,22 @@ namespace MS.MulticastDownloader.Core.Cryptography
     using System.IO;
     using System.Threading.Tasks;
     using IO;
+    using Org.BouncyCastle.Asn1;
     using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Crypto.Generators;
+    using Org.BouncyCastle.Crypto.Operators;
+    using Org.BouncyCastle.Math;
     using Org.BouncyCastle.OpenSsl;
     using Org.BouncyCastle.Security;
+    using Org.BouncyCastle.X509;
+    using Org.BouncyCastle.X509.Extension;
     using PCLStorage;
+    using asn1x509 = Org.BouncyCastle.Asn1.X509;
 
     /// <summary>
-    /// Represent an asymmetric key pair generator.
+    /// Represent a stream writer for secrets.
     /// </summary>
-    public static class AsymmetricKeyPairWriter
+    public static class SecretWriter
     {
         /// <summary>
         /// Writes the PEM-encoded asymmetric key pair cipher to a pair of streams.
@@ -27,15 +33,15 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <param name="strength">The strength.</param>
         public static void WriteAsymmetricKeyPair(Stream privateKeyFile, Stream publicKeyFile, int strength)
         {
-            RsaKeyPairGenerator keyPairGenerator = new RsaKeyPairGenerator();
-            keyPairGenerator.Init(new KeyGenerationParameters(new SecureRandom(), strength));
-            AsymmetricCipherKeyPair keyPair = keyPairGenerator.GenerateKeyPair();
-            PemWriter privateWriter = new PemWriter(new StreamWriter(privateKeyFile));
-            privateWriter.WriteObject(keyPair.Private);
-            PemWriter publicWriter = new PemWriter(new StreamWriter(publicKeyFile));
-            publicWriter.WriteObject(keyPair.Public);
-            privateWriter.Writer.Flush();
-            publicWriter.Writer.Flush();
+            AsymmetricCipherKeyPair keyPair = GenerateKeyPair(strength);
+            using (StreamWriter privateStreamWriter = new StreamWriter(privateKeyFile))
+            using (StreamWriter publicStreamWriter = new StreamWriter(publicKeyFile))
+            {
+                PemWriter privateWriter = new PemWriter(privateStreamWriter);
+                privateWriter.WriteObject(keyPair.Private);
+                PemWriter publicWriter = new PemWriter(publicStreamWriter);
+                publicWriter.WriteObject(keyPair.Public);
+            }
         }
 
         /// <summary>
@@ -55,6 +61,14 @@ namespace MS.MulticastDownloader.Core.Cryptography
             {
                 WriteAsymmetricKeyPair(privateStream, publicStream, strength);
             }
+        }
+
+        private static AsymmetricCipherKeyPair GenerateKeyPair(int strength)
+        {
+            RsaKeyPairGenerator keyPairGenerator = new RsaKeyPairGenerator();
+            keyPairGenerator.Init(new KeyGenerationParameters(new SecureRandom(), strength));
+            AsymmetricCipherKeyPair keyPair = keyPairGenerator.GenerateKeyPair();
+            return keyPair;
         }
     }
 }

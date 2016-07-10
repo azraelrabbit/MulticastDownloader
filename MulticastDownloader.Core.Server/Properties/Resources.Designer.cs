@@ -62,11 +62,38 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Certificate type mismatch: expected a private key file..
+        /// </summary>
+        internal static string CertificateTypeMismatch {
+            get {
+                return ResourceManager.GetString("CertificateTypeMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Could not find the specified interface on this server..
         /// </summary>
         internal static string CouldNotFindInterface {
             get {
                 return ResourceManager.GetString("CouldNotFindInterface", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to IPV6 multicast addresses are not currently supported..
+        /// </summary>
+        internal static string Ipv6MulticastNotSupported {
+            get {
+                return ResourceManager.GetString("Ipv6MulticastNotSupported", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify a key file when using TLS..
+        /// </summary>
+        internal static string MustSpecifyKeyFile {
+            get {
+                return ResourceManager.GetString("MustSpecifyKeyFile", resourceCulture);
             }
         }
     }

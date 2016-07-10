@@ -57,8 +57,7 @@
     <Compile Include="Session\FileHeaderTest.cs" />
     <Compile Include="IO\FileSystemTest.cs" />
     <Compile Include="Session\FileSetTest.cs" />
-    <Compile Include="TestMulticastServerSettings.cs" />
-    <Compile Include="TestMulticastSettings.cs" />
+    <Compile Include="TestOutputLoggerFactoryAdapter.cs" />
     <Compile Include="Util\Runtime.cs" />
   </ItemGroup>
   <ItemGroup>

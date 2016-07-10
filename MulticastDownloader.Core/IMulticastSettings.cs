@@ -6,6 +6,9 @@ namespace MS.MulticastDownloader.Core
 {
     using System;
     using Cryptography;
+    using Org.BouncyCastle.OpenSsl;
+    using Org.BouncyCastle.X509;
+    using PCLStorage;
 
     /// <summary>
     /// Represent multicast session settings.

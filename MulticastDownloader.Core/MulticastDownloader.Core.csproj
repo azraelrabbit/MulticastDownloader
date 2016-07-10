@@ -56,9 +56,13 @@
     <Compile Include="Cryptography\AsymmetricEncoderFactory.cs" />
     <Compile Include="Cryptography\AsymmetricSecretFlags.cs" />
     <Compile Include="Cryptography\BufferedCipherBaseExtensions.cs" />
+    <Compile Include="Cryptography\HashEncoder.cs" />
+    <Compile Include="Cryptography\HashEncoderFactory.cs" />
+    <Compile Include="Cryptography\IDecoder.cs" />
     <Compile Include="Cryptography\IEncoder.cs" />
-    <Compile Include="Cryptography\AsymmetricKeyPairWriter.cs" />
+    <Compile Include="Cryptography\SecretWriter.cs" />
     <Compile Include="Cryptography\IEncoderFactory.cs" />
+    <Compile Include="Cryptography\ITcpSocketClientExtensions.cs" />
     <Compile Include="Cryptography\NamespaceDoc.cs" />
     <Compile Include="Cryptography\PassphraseEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricEncoder.cs" />
@@ -66,7 +70,7 @@
     <Compile Include="IO\ChunkBase.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
-    <Compile Include="IO\ClientUdpReader.cs" />
+    <Compile Include="IO\UdpReader.cs" />
     <Compile Include="IO\ConnectionBase.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
     <Compile Include="IO\SessionConnectionBase.cs" />

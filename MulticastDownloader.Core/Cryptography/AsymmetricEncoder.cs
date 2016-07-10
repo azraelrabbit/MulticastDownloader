@@ -17,14 +17,14 @@ namespace MS.MulticastDownloader.Core.Cryptography
     /// Represent a key-based asymmetric encoder using PEM format certificates for storing key data.
     /// </summary>
     /// <seealso cref="MS.MulticastDownloader.Core.Cryptography.IEncoder" />
-    public class AsymmetricEncoder : IEncoder
+    /// <seealso cref="MS.MulticastDownloader.Core.Cryptography.IDecoder" />
+    public class AsymmetricEncoder : IEncoder, IDecoder
     {
-        private BufferedAsymmetricBlockCipher encoder;
-        private BufferedAsymmetricBlockCipher decoder;
+        private BufferedAsymmetricBlockCipher cipher;
 
-        internal AsymmetricEncoder(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
+        internal AsymmetricEncoder(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder, bool encode)
         {
-            this.Init(keyParam, flags, passwordFinder);
+            this.Init(keyParam, flags, passwordFinder, encode);
         }
 
         /// <summary>
@@ -34,7 +34,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <returns>The length in bytes.</returns>
         public int GetEncodedOutputLength(int input)
         {
-            return this.encoder.GetOutputSize(input);
+            return this.cipher.GetOutputSize(input);
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
                 throw new ArgumentNullException("unencoded");
             }
 
-            return this.encoder.Process(unencoded);
+            return this.cipher.Process(unencoded);
         }
 
         /// <summary>
@@ -64,15 +64,13 @@ namespace MS.MulticastDownloader.Core.Cryptography
                 throw new ArgumentNullException("encoded");
             }
 
-            return this.decoder.Process(encoded);
+            return this.cipher.Process(encoded);
         }
 
-        private void Init(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder)
+        private void Init(AsymmetricKeyParameter keyParam, AsymmetricSecretFlags flags, IPasswordFinder passwordFinder, bool encode)
         {
-            this.encoder = new BufferedAsymmetricBlockCipher(new RsaEngine());
-            this.decoder = new BufferedAsymmetricBlockCipher(new RsaEngine());
-            this.encoder.Init(true, keyParam);
-            this.decoder.Init(false, keyParam);
+            this.cipher = new BufferedAsymmetricBlockCipher(new RsaEngine());
+            this.cipher.Init(encode, keyParam);
         }
     }
 }

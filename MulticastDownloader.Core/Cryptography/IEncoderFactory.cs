@@ -17,5 +17,11 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// </summary>
         /// <returns>An encoder.</returns>
         IEncoder CreateEncoder();
+
+        /// <summary>
+        /// Creates the decoder.
+        /// </summary>
+        /// <returns>A decoder.</returns>
+        IDecoder CreateDecoder();
     }
 }

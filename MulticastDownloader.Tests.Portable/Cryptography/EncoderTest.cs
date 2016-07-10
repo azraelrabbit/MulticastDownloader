@@ -17,13 +17,11 @@ namespace MS.MulticastDownloader.Tests.Cryptography
     public class EncoderTest
     {
         [Theory]
-        [InlineData("123", 128)]
-        public void PassphraseEncoderConstructed(string passPhrase, int strength)
+        [InlineData("123")]
+        public void PassphraseEncoderConstructed(string passPhrase)
         {
-            Crypto.PassphraseEncoderFactory fac = new Crypto.PassphraseEncoderFactory(passPhrase,  Encoding.UTF8, strength);
+            Crypto.PassphraseEncoderFactory fac = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
             Crypto.PassphraseEncoder enc = (Crypto.PassphraseEncoder)fac.CreateEncoder();
-            Assert.Equal(passPhrase, enc.Passphrase);
-            Assert.Equal(strength, enc.Strength);
         }
 
         [Theory]
@@ -33,7 +31,7 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             Assert.NotEmpty(privateKey);
             Assert.NotEmpty(publicKey);
             Assert.NotInRange(strength, int.MinValue, 0);
-            await Crypto.AsymmetricKeyPairWriter.WriteAsymmetricKeyPair(FileSystem.Current.LocalStorage, privateKey, publicKey, strength);
+            await Crypto.SecretWriter.WriteAsymmetricKeyPair(FileSystem.Current.LocalStorage, privateKey, publicKey, strength);
         }
 
         [Theory]
@@ -55,27 +53,27 @@ namespace MS.MulticastDownloader.Tests.Cryptography
         }
 
         [Theory]
-        [InlineData("12345", 128, new int[] { 1, 2, 3, 4, 5, 6, 7, 8, -1, 9, 10, 11, 12 })]
-        public void PassphraseEncoderDecodesPassphraseData(string passPhrase, int strength, int[] testData)
+        [InlineData("12345", new int[] { 1, 2, 3, 4, 5, 6, 7, 8, -1, 9, 10, 11, 12 })]
+        public void PassphraseEncoderDecodesPassphraseData(string passPhrase, int[] testData)
         {
             Assert.NotNull(testData);
             Assert.NotEmpty(passPhrase);
-            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8, strength);
-            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8, strength);
-            CheckDataEquals(testData, enc.CreateEncoder(), dec.CreateEncoder());
+            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
+            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
+            CheckDataEquals(testData, enc.CreateEncoder(), dec.CreateDecoder());
         }
 
         [Theory]
-        [InlineData("12345", "456", 128, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public void PassphraseEncoderDoesNotDecodeWithWrongPassphrase(string expectedPhrase, string actualPhrase, int strength, int[] testData)
+        [InlineData("12345", "456", new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public void PassphraseEncoderDoesNotDecodeWithWrongPassphrase(string expectedPhrase, string actualPhrase, int[] testData)
         {
             Assert.NotNull(testData);
             Assert.NotEmpty(expectedPhrase);
             Assert.NotEmpty(actualPhrase);
             Assert.NotEqual(expectedPhrase, actualPhrase);
-            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(expectedPhrase, Encoding.UTF8, strength);
-            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(actualPhrase, Encoding.UTF8, strength);
-            CheckDataNotEquals(testData, enc.CreateEncoder(), dec.CreateEncoder());
+            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(expectedPhrase, Encoding.UTF8);
+            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(actualPhrase, Encoding.UTF8);
+            CheckDataNotEquals(testData, enc.CreateEncoder(), dec.CreateDecoder());
         }
 
         [Theory]
@@ -86,7 +84,7 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, publicKey, strength);
             Crypto.AsymmetricEncoderFactory encodedPublic1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoderFactory encodedPrivate1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            CheckDataEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateEncoder());
+            CheckDataEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateDecoder());
         }
 
         [Theory]
@@ -97,7 +95,7 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, publicKey, strength);
             Crypto.AsymmetricEncoderFactory encodedPublic1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoderFactory encodedPrivate1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            CheckDataEquals(testData, encodedPublic1.CreateEncoder(), encodedPrivate1.CreateEncoder());
+            CheckDataEquals(testData, encodedPublic1.CreateEncoder(), encodedPrivate1.CreateDecoder());
         }
 
         [Theory]
@@ -108,7 +106,7 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             await this.AsymmetricKeyFilesCanBeGenerated("unused", publicKey, strength);
             Crypto.AsymmetricEncoderFactory encodedPublic1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoderFactory encodedPublic2 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, publicKey, Crypto.AsymmetricSecretFlags.None);
-            CheckDataNotEquals(testData, encodedPublic1.CreateEncoder(), encodedPublic2.CreateEncoder());
+            CheckDataNotEquals(testData, encodedPublic1.CreateEncoder(), encodedPublic2.CreateDecoder());
         }
 
         [Theory]
@@ -120,20 +118,20 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             await this.AsymmetricKeyFilesCanBeGenerated(privateKey, "unused", strength);
             Crypto.AsymmetricEncoderFactory encodedPublic1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, publicKey, Crypto.AsymmetricSecretFlags.None);
             Crypto.AsymmetricEncoderFactory encodedPrivate1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
-            CheckDataNotEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateEncoder());
+            CheckDataNotEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateDecoder());
         }
 
         [Theory]
-        [InlineData("12345", 128, 10, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
-        public void PassphraseEncoderParalellizable(string passPhrase, int strength, int numThreads, int[] testData)
+        [InlineData("12345", 128, new int[] { 1, 2, 3, 4, 5, 6, 7, 8 })]
+        public void PassphraseEncoderParalellizable(string passPhrase, int numThreads, int[] testData)
         {
             Assert.NotNull(testData);
             Assert.NotEmpty(passPhrase);
-            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8, strength);
-            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8, strength);
+            Crypto.PassphraseEncoderFactory enc = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
+            Crypto.PassphraseEncoderFactory dec = new Crypto.PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
             Parallel.For(0, numThreads, (d, s) =>
             {
-                CheckDataEquals(testData, enc.CreateEncoder(), dec.CreateEncoder());
+                CheckDataEquals(testData, enc.CreateEncoder(), dec.CreateDecoder());
             });
         }
 
@@ -147,11 +145,11 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             Crypto.AsymmetricEncoderFactory encodedPrivate1 = await Crypto.AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, privateKey, Crypto.AsymmetricSecretFlags.ReadPrivateKey);
             Parallel.For(0, numThreads, (d, s) =>
             {
-                CheckDataEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateEncoder());
+                CheckDataEquals(testData, encodedPrivate1.CreateEncoder(), encodedPublic1.CreateDecoder());
             });
         }
 
-        private static void CheckDataNotEquals(int[] testData, Crypto.IEncoder enc, Crypto.IEncoder dec)
+        private static void CheckDataNotEquals(int[] testData, Crypto.IEncoder enc, Crypto.IDecoder dec)
         {
             List<byte> buf = new List<byte>();
             foreach (int v in testData)
@@ -180,7 +178,7 @@ namespace MS.MulticastDownloader.Tests.Cryptography
             }
         }
 
-        private static void CheckDataEquals(int[] testData, Crypto.IEncoder enc, Crypto.IEncoder dec)
+        private static void CheckDataEquals(int[] testData, Crypto.IEncoder enc, Crypto.IDecoder dec)
         {
             List<byte> buf = new List<byte>();
             foreach (int v in testData)

@@ -13,19 +13,23 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using Common.Logging;
     using Core.IO;
     using Cryptography;
+    using Org.BouncyCastle.Crypto.Tls;
     using ProtoBuf;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
     internal class ServerConnection : SessionConnectionBase
     {
-        private ILog log = LogManager.GetLogger<ServerConnection>();
-
-        internal ServerConnection(UriParameters parms, IMulticastSettings settings, ITcpSocketClient client)
+        internal ServerConnection(UriParameters parms, IMulticastSettings settings)
             : base(parms, settings)
         {
-            Contract.Requires(client != null);
-            this.SetTcpSession(client);
+        }
+
+        internal void AcceptTls(byte[] psk)
+        {
+            Contract.Requires(this.UriParameters.UseTls);
+            TlsServerProtocol serverProtocol = this.TcpSession.AcceptTls(psk);
+            this.TlsStream = serverProtocol.Stream;
         }
     }
 }

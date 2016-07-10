@@ -50,6 +50,36 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="UriParameters"/> class.
+        /// </summary>
+        /// <param name="uri">The URI.</param>
+        public UriParameters(Uri uri)
+        {
+            if (uri == null)
+            {
+                throw new ArgumentNullException("uri");
+            }
+
+            if (uri.Scheme == TlsScheme)
+            {
+                this.UseTls = true;
+            }
+            else if (uri.Scheme != NormalScheme)
+            {
+                throw new ArgumentException(Resources.InvalidUriScheme);
+            }
+
+            this.Hostname = uri.DnsSafeHost;
+            this.Port = uri.Port;
+            if (this.Port <= 0)
+            {
+                this.Port = DefaultPort;
+            }
+
+            this.Path = uri.AbsolutePath;
+        }
+
+        /// <summary>
         /// Gets or sets the hostname.
         /// </summary>
         /// <value>
@@ -108,9 +138,9 @@ namespace MS.MulticastDownloader.Core
         public Uri ToUri()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append(this.UseTls ? TlsScheme : NormalScheme + "://");
+            sb.Append((this.UseTls ? TlsScheme : NormalScheme) + "://");
             sb.Append(this.Hostname ?? string.Empty);
-            if (this.Port == DefaultPort)
+            if (this.Port != DefaultPort)
             {
                 sb.Append(":" + this.Port);
             }

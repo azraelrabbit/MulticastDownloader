@@ -117,7 +117,16 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="CertificateTypeMismatch" xml:space="preserve">
+    <value>Certificate type mismatch: expected a private key file.</value>
+  </data>
   <data name="CouldNotFindInterface" xml:space="preserve">
     <value>Could not find the specified interface on this server.</value>
+  </data>
+  <data name="Ipv6MulticastNotSupported" xml:space="preserve">
+    <value>IPV6 multicast addresses are not currently supported.</value>
+  </data>
+  <data name="MustSpecifyKeyFile" xml:space="preserve">
+    <value>Must specify a key file when using TLS.</value>
   </data>
 </root>

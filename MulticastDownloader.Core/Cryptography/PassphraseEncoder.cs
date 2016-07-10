@@ -16,13 +16,12 @@ namespace MS.MulticastDownloader.Core.Cryptography
     /// Represent a passphrase-based secret.
     /// </summary>
     /// <seealso cref="MS.MulticastDownloader.Core.Cryptography.IEncoder" />
-    public class PassphraseEncoder : IEncoder
+    /// <seealso cref="MS.MulticastDownloader.Core.Cryptography.IDecoder" />
+    public class PassphraseEncoder : IEncoder, IDecoder
     {
-        private ICipherParameters cipher;
-        private BufferedBlockCipher encoder;
-        private BufferedBlockCipher decoder;
+        private HashEncoder encoder;
 
-        internal PassphraseEncoder(string passPhrase, Encoding enc, int blockBits)
+        internal PassphraseEncoder(string passPhrase, Encoding enc, int blockBits, bool encode)
         {
             if (string.IsNullOrEmpty(passPhrase))
             {
@@ -34,32 +33,8 @@ namespace MS.MulticastDownloader.Core.Cryptography
                 throw new ArgumentNullException("enc");
             }
 
-            if (blockBits % 8 != 0)
-            {
-                throw new ArgumentException(Resources.BlockSizeMustBeMultipleOf8);
-            }
-
-            this.Passphrase = passPhrase;
-            this.Strength = blockBits;
-            this.cipher = CreateCipher(passPhrase, enc, blockBits / 8);
-            IBlockCipherPadding padding = new Pkcs7Padding();
-            this.encoder = new PaddedBufferedBlockCipher(new RijndaelEngine(blockBits), padding);
-            this.decoder = new PaddedBufferedBlockCipher(new RijndaelEngine(blockBits), padding);
-            int keySize = blockBits >> 3;
-            this.encoder.Init(true, this.cipher);
-            this.decoder.Init(false, this.cipher);
-        }
-
-        internal string Passphrase
-        {
-            get;
-            private set;
-        }
-
-        internal int Strength
-        {
-            get;
-            private set;
+            byte[] hash = enc.GetBytes(passPhrase);
+            this.encoder = new HashEncoder(hash, blockBits, encode);
         }
 
         /// <summary>
@@ -69,7 +44,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <returns>The length in bytes.</returns>
         public int GetEncodedOutputLength(int input)
         {
-            return this.encoder.GetOutputSize(input);
+            return this.encoder.GetEncodedOutputLength(input);
         }
 
         /// <summary>
@@ -79,12 +54,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <returns>A byte array.</returns>
         public byte[] Encode(byte[] unencoded)
         {
-            if (unencoded == null)
-            {
-                throw new ArgumentNullException("unencoded");
-            }
-
-            return this.encoder.Process(unencoded);
+            return this.encoder.Encode(unencoded);
         }
 
         /// <summary>
@@ -94,25 +64,7 @@ namespace MS.MulticastDownloader.Core.Cryptography
         /// <returns>A byte array.</returns>
         public byte[] Decode(byte[] encoded)
         {
-            if (encoded == null)
-            {
-                throw new ArgumentNullException("encoded");
-            }
-
-            return this.decoder.Process(encoded);
-        }
-
-        private static ICipherParameters CreateCipher(string passPhrase, Encoding encoding, int desiredLength)
-        {
-            byte[] encoded = encoding.GetBytes(passPhrase);
-            if (encoded.Length < desiredLength)
-            {
-                byte[] ret = new byte[desiredLength];
-                Buffer.BlockCopy(encoded, 0, ret, 0, encoded.Length);
-                return new KeyParameter(ret);
-            }
-
-            return new KeyParameter(encoded);
+            return this.encoder.Decode(encoded);
         }
     }
 }

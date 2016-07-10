@@ -111,6 +111,7 @@
     <Compile Include="..\MulticastDownloader.Tests.Portable\**\*.cs">
       <Link>%(RecursiveDir)\%(Filename)%(Extension)</Link>
     </Compile>
+    <Compile Include="UriParametersTest.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MulticastDownloader.Commands\MulticastDownloader.Commands.csproj">
