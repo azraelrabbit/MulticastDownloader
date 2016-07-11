@@ -129,6 +129,9 @@
   <data name="ClientNotInitialized" xml:space="preserve">
     <value>TCP client not initialized.</value>
   </data>
+  <data name="ConnectionFailed" xml:space="preserve">
+    <value>Connection failed: check the connection URI and verify your encoding parameters.</value>
+  </data>
   <data name="DuplicateFile" xml:space="preserve">
     <value>Duplicate file entry in table.</value>
   </data>
@@ -150,10 +153,25 @@
   <data name="InvalidUriScheme" xml:space="preserve">
     <value>Invalid URI scheme.</value>
   </data>
-  <data name="MustSpecifyKeyFile" xml:space="preserve">
-    <value>Must specify a valid key file when using TLS.</value>
+  <data name="MulticastDownloadFailed" xml:space="preserve">
+    <value>Multicast download failed.</value>
+  </data>
+  <data name="MustSpecifyEncoder" xml:space="preserve">
+    <value>Must specify a valid encoder when using TLS.</value>
+  </data>
+  <data name="RequestFailed" xml:space="preserve">
+    <value>Request failed.</value>
+  </data>
+  <data name="SessionAborted" xml:space="preserve">
+    <value>Session aborted.</value>
+  </data>
+  <data name="StatusUpdateFailed" xml:space="preserve">
+    <value>Status update failed.</value>
   </data>
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>
+  </data>
+  <data name="TcpDownloadFailed" xml:space="preserve">
+    <value>TCP download failed.</value>
   </data>
 </root>

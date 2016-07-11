@@ -14,6 +14,6 @@ namespace MS.MulticastDownloader.Core.Session
         internal bool LeavingSession { get; set; }
 
         [ProtoMember(2)]
-        internal long SegmentsLeft { get; set; }
+        internal long BytesLeft { get; set; }
     }
 }

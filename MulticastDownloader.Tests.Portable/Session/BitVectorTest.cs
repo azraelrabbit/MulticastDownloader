@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Tests.Session
 {
+    using System.Linq;
     using System.Threading.Tasks;
     using Core.Session;
     using Xunit;
@@ -54,6 +55,9 @@ namespace MS.MulticastDownloader.Tests.Session
                 bv[i] = sequence[i];
                 Assert.Equal(bv[i], sequence[i]);
             }
+
+            Assert.Equal(sequence.Contains(true), bv.Contains(true));
+            Assert.Equal(sequence.Contains(false), bv.Contains(false));
         }
 
         [Theory]
@@ -78,6 +82,9 @@ namespace MS.MulticastDownloader.Tests.Session
             bool expected = !bv[flipIndex];
             bv[flipIndex] = !bv[flipIndex];
             Assert.Equal(expected, bv[flipIndex]);
+            sequence[flipIndex] = !sequence[flipIndex];
+            Assert.Equal(sequence.Contains(true), bv.Contains(true));
+            Assert.Equal(sequence.Contains(false), bv.Contains(false));
         }
 
         [Theory]

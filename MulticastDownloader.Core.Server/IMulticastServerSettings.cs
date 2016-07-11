@@ -99,16 +99,5 @@ namespace MS.MulticastDownloader.Core.Server
         /// The maximum sessions.
         /// </value>
         int MaxSessions { get; }
-
-        /// <summary>
-        /// Gets the multicast root folder.
-        /// </summary>
-        /// <remarks>
-        /// The root folder is the path under which the <see cref="UriParameters.Path"/> member refers for an individual session join request.
-        /// </remarks>
-        /// <value>
-        /// The root folder.
-        /// </value>
-        IFolder RootFolder { get; }
     }
 }

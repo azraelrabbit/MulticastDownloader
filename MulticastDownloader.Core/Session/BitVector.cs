@@ -168,15 +168,28 @@ namespace MS.MulticastDownloader.Core.Session
         /// </returns>
         public bool Contains(bool item)
         {
-            for (int i = 0; i < this.RawBits.Length; ++i)
+            long longCount = this.RawBits.LongCount();
+            int remainder = 8 - (int)(this.LongCount % 8);
+            byte uMask = 0;
+            Parallel.For(0, longCount, (i) =>
             {
-                if (this.RawBits[i] > 0)
+                byte valid = 0xFF;
+                if (i == longCount - 1)
                 {
-                    return true;
+                    valid = (byte)(0xFF >> remainder);
                 }
-            }
 
-            return false;
+                if (item)
+                {
+                    uMask |= (byte)(this.RawBits[i] & valid);
+                }
+                else
+                {
+                    uMask |= (byte)(~this.RawBits[i] & valid);
+                }
+            });
+
+            return uMask > 0;
         }
 
         /// <summary>

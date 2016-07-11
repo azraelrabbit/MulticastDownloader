@@ -61,7 +61,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
         internal async Task<UdpWriter> CreateWriter(int sessionId, IEncoderFactory encoder)
         {
             UdpWriter broadcaster = new UdpWriter(this.UriParameters, this.Settings, this.ServerSettings);
-            await broadcaster.StartMulticastServer(this.ServerSettings.MulticastStartPort + sessionId, encoder);
+            await broadcaster.StartMulticastServer(sessionId, encoder);
             return broadcaster;
         }
 

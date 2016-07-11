@@ -76,6 +76,8 @@
     <Compile Include="IO\SessionConnectionBase.cs" />
     <Compile Include="IO\TaskExtensionMethods.cs" />
     <Compile Include="IMulticastSettings.cs" />
+    <Compile Include="SessionAbortedException.cs" />
+    <Compile Include="Session\ChallengeResponse.cs" />
     <Compile Include="Session\WaveCompleteResponse.cs" />
     <Compile Include="Session\WaveStatusUpdateRequest.cs" />
     <Compile Include="UriParameters.cs" />

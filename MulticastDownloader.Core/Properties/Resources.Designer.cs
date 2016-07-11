@@ -98,6 +98,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Connection failed: check the connection URI and verify your encoding parameters..
+        /// </summary>
+        internal static string ConnectionFailed {
+            get {
+                return ResourceManager.GetString("ConnectionFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Duplicate file entry in table..
         /// </summary>
         internal static string DuplicateFile {
@@ -161,11 +170,47 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Must specify a valid key file when using TLS..
+        ///   Looks up a localized string similar to Multicast download failed..
         /// </summary>
-        internal static string MustSpecifyKeyFile {
+        internal static string MulticastDownloadFailed {
             get {
-                return ResourceManager.GetString("MustSpecifyKeyFile", resourceCulture);
+                return ResourceManager.GetString("MulticastDownloadFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify a valid encoder when using TLS..
+        /// </summary>
+        internal static string MustSpecifyEncoder {
+            get {
+                return ResourceManager.GetString("MustSpecifyEncoder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Request failed..
+        /// </summary>
+        internal static string RequestFailed {
+            get {
+                return ResourceManager.GetString("RequestFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Session aborted..
+        /// </summary>
+        internal static string SessionAborted {
+            get {
+                return ResourceManager.GetString("SessionAborted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Status update failed..
+        /// </summary>
+        internal static string StatusUpdateFailed {
+            get {
+                return ResourceManager.GetString("StatusUpdateFailed", resourceCulture);
             }
         }
         
@@ -175,6 +220,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         internal static string StringCannotBeNullOrEmpty {
             get {
                 return ResourceManager.GetString("StringCannotBeNullOrEmpty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to TCP download failed..
+        /// </summary>
+        internal static string TcpDownloadFailed {
+            get {
+                return ResourceManager.GetString("TcpDownloadFailed", resourceCulture);
             }
         }
     }

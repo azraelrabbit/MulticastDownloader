@@ -19,6 +19,11 @@ namespace MS.MulticastDownloader.Core.Session
         [ProtoMember(2)]
         internal string Message { get; set; }
 
+        public override string ToString()
+        {
+            return "id: " + this.ResponseType + " (" + (int)this.ResponseType + "):" + (this.Message ?? "<null>");
+        }
+
         internal static T CreateFailure<T>(ResponseId responseType, string message)
             where T : Response, new()
         {
