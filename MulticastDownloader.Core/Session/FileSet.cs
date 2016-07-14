@@ -114,6 +114,13 @@ namespace MS.MulticastDownloader.Core.Session
 
         internal async Task Clean()
         {
+            foreach (Stream s in this.streamsByHeaderIndex)
+            {
+                s.Dispose();
+            }
+
+            this.streamsByHeaderIndex.Clear();
+
             foreach (FileHeader header in this.headers)
             {
                 await this.rootFolder.Delete(header.Name);

@@ -21,6 +21,7 @@ namespace MS.MulticastDownloader.Core.IO
 
     internal class UdpReader : ConnectionBase
     {
+        private const int ReadDelay = 1000;
         private ILog log = LogManager.GetLogger<UdpReader>();
         private IEncoderFactory encoder;
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
@@ -81,7 +82,7 @@ namespace MS.MulticastDownloader.Core.IO
                 int bufferSize = this.Settings.MulticastBufferSize;
                 IEncoderFactory encoderFactory = this.encoder;
                 List<byte[]> pendingDeserializes = new List<byte[]>(this.multicastPackets.Count);
-                this.packetQueuedEvent.WaitOne();
+                this.packetQueuedEvent.WaitOne(ReadDelay);
                 byte[] next;
                 while (this.multicastPackets.TryDequeue(out next))
                 {

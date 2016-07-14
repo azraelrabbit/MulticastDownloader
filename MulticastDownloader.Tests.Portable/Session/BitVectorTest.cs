@@ -92,7 +92,7 @@ namespace MS.MulticastDownloader.Tests.Session
         [InlineData(new bool[] { false, false, false }, new bool[] { true, true, true })]
         [InlineData(new bool[] { false, true, false }, new bool[] { true, false, true })]
         [InlineData(new bool[] { true, false, true }, new bool[] { false, true, false })]
-        public async Task BitVectorUnionsTwoSequences(bool[] seq1, bool[] seq2)
+        public void BitVectorIntersectsTwoSequences(bool[] seq1, bool[] seq2)
         {
             Assert.Equal(seq1.Length, seq2.Length);
             BitVector bv1 = new BitVector(seq1.Length);
@@ -107,11 +107,11 @@ namespace MS.MulticastDownloader.Tests.Session
                 bv2[i] = seq2[i];
             }
 
-            BitVector c = await BitVector.UnionOf(new BitVector[] { bv1, bv2 });
+            BitVector c = BitVector.IntersectOf(new BitVector[] { bv1, bv2 });
             Assert.Equal(seq1.Length, c.LongCount);
             for (int i = 0; i < seq2.Length; ++i)
             {
-                Assert.Equal(bv1[i] || bv2[i], c[i]);
+                Assert.Equal(bv1[i] && bv2[i], c[i]);
             }
         }
     }

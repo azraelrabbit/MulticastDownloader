@@ -15,7 +15,6 @@ namespace MS.MulticastDownloader.Core
     using IO;
     using Properties;
     using Session;
-    using Sockets;
 
     /// <summary>
     /// Represent a multicast client.
@@ -24,19 +23,23 @@ namespace MS.MulticastDownloader.Core
     {
         internal const int PacketUpdateInterval = 1000;
         internal const int EncoderSize = 256;
+        internal static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(30);
         internal static readonly byte[] ResponseId = Encoding.UTF8.GetBytes("client");
 
         private ILog log = LogManager.GetLogger<MulticastClient>();
         private IEncoderFactory fileEncoder;
         private CancellationToken token;
+        private FileHeader[] files = null;
         private FileSet fileSet;
-        private FileChunk[] chunks;
         private BitVector written;
         private ClientConnection cliConn;
         private ChunkWriter writer;
         private UdpReader udpReader;
+        private SeqNum seqNum;
+        private Task writeTask = null;
         private int state;
         private bool tcpDownload = false;
+        private bool canReconnect;
         private bool disposedValue = false;
         private bool complete = false;
 
@@ -168,6 +171,26 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
+        /// Gets the current sequence number in the download.
+        /// </summary>
+        /// <value>
+        /// The sequence number.
+        /// </value>
+        public long SequenceNumber
+        {
+            get
+            {
+                SeqNum seq = this.seqNum;
+                if (seq != null)
+                {
+                    return seq.Seq;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Starts the multicast transfer.
         /// </summary>
         /// <param name="token">The optional cancellation token.</param>
@@ -178,33 +201,59 @@ namespace MS.MulticastDownloader.Core
             this.token = token;
             return Task.Run(async () =>
             {
-                try
+                int attempt = 0;
+                this.complete = false;
+
+                while (!this.complete)
                 {
-                    this.log.Debug("Starting transfer");
-
-                    // Connect to the server, authenticate and receive the multicast payload.
-                    await this.ConnectToServer();
-                    await this.RequestFilesAndBeginReading();
-
-                    // Now begin processing received packets and transmitting them back to the service.
-                    await this.MulticastDownload();
-
-                    // Finally, if we're receiving the rest of our payload through TCP, download it here.
-                    if (this.tcpDownload)
+                    this.canReconnect = false;
+                    this.writeTask = null;
+                    if (attempt++ > 0)
                     {
-                        await this.TcpDownload();
+                        this.log.Info("Reconnecting. Attempt " + attempt);
+                        this.DisposeInternal();
+                        await Task.Delay(ReconnectDelay, this.token);
                     }
 
-                    await this.writer.Flush();
-                    this.log.Info("Transfer complete");
-                    this.complete = true;
-                    await this.cliConn.Close();
-                    await this.udpReader.Close();
-                }
-                catch (Exception ex)
-                {
-                    this.log.Fatal(ex);
-                    throw;
+                    try
+                    {
+                        this.log.Debug("Starting transfer");
+
+                        // Connect to the server, authenticate and receive the multicast payload.
+                        await this.ConnectToServer();
+                        await this.RequestFilesAndBeginReading();
+                        this.canReconnect = true;
+
+                        // Now begin processing received packets and transmitting them back to the service.
+                        await this.MulticastDownload();
+
+                        // Finally, if we're receiving the rest of our payload through TCP, download it here.
+                        if (this.tcpDownload)
+                        {
+                            await this.TcpDownload();
+                        }
+
+                        await this.writer.Flush();
+                        this.log.Info("Transfer complete");
+                        await this.cliConn.Close();
+                        await this.udpReader.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!this.canReconnect || (ex is SessionAbortedException) || (ex is OperationCanceledException))
+                        {
+                            this.log.Error("Session aborted: " + ex.GetType() + " '" + ex.Message + "'");
+                            await this.TryCleanFiles();
+                            if (!(ex is SessionAbortedException) && !(ex is OperationCanceledException))
+                            {
+                                throw new SessionAbortedException(Resources.SessionAborted, ex);
+                            }
+
+                            throw;
+                        }
+
+                        this.log.Error(ex);
+                    }
                 }
             });
         }
@@ -228,25 +277,29 @@ namespace MS.MulticastDownloader.Core
                 this.disposedValue = true;
                 if (disposing)
                 {
-                    if (this.cliConn != null)
-                    {
-                        this.cliConn.Dispose();
-                    }
-
-                    if (this.udpReader != null)
-                    {
-                        this.udpReader.Dispose();
-                    }
-
-                    if (this.fileSet != null)
-                    {
-                        this.fileSet.Dispose();
-                    }
+                    this.DisposeInternal();
                 }
 
                 this.written = null;
-                this.chunks = null;
                 this.writer = null;
+            }
+        }
+
+        private void DisposeInternal()
+        {
+            if (this.cliConn != null)
+            {
+                this.cliConn.Dispose();
+            }
+
+            if (this.udpReader != null)
+            {
+                this.udpReader.Dispose();
+            }
+
+            if (this.fileSet != null)
+            {
+                this.fileSet.Dispose();
             }
         }
 
@@ -265,10 +318,6 @@ namespace MS.MulticastDownloader.Core
                     IDecoder decoder = this.Settings.Encoder.CreateDecoder();
                     psk = decoder.Decode(challenge.ChallengeKey);
                 }
-                else
-                {
-                    psk = challenge.ChallengeKey;
-                }
 
                 this.log.Debug("Challenge: " + Convert.ToBase64String(challenge.ChallengeKey) + " PSK: " + Convert.ToBase64String(psk));
                 if (this.Parameters.UseTls)
@@ -278,12 +327,19 @@ namespace MS.MulticastDownloader.Core
                 }
 
                 // We'll use the file encoder on the PSK to decode file data.
-                this.fileEncoder = new HashEncoderFactory(psk, EncoderSize);
-                IEncoder encoder = this.fileEncoder.CreateEncoder();
-
                 ChallengeResponse response = new ChallengeResponse();
-                response.ChallengeKey = encoder.Encode(ResponseId);
-                this.log.Debug("Response: " + Convert.ToBase64String(psk));
+                if (psk != null)
+                {
+                    this.fileEncoder = new HashEncoderFactory(psk, EncoderSize);
+                    IEncoder encoder = this.fileEncoder.CreateEncoder();
+                    response.ChallengeKey = encoder.Encode(ResponseId);
+                }
+                else
+                {
+                    response.ChallengeKey = ResponseId;
+                }
+
+                this.log.Debug("Challenge Response: " + Convert.ToBase64String(response.ChallengeKey));
                 await this.cliConn.Send(response, this.token);
 
                 Response authResponse = await this.CheckResponse<Response>();
@@ -306,11 +362,21 @@ namespace MS.MulticastDownloader.Core
                 await this.cliConn.Send(request, this.token);
 
                 SessionJoinResponse response = await this.CheckResponse<SessionJoinResponse>();
+                if (this.files != null && !this.files.SequenceEqual(response.Files))
+                {
+                    this.log.Error("Payload differs.");
+                    throw new SessionAbortedException(Resources.ServerPayloadMismatch);
+                }
+
                 this.fileSet = new FileSet(this.Settings.RootFolder, response.Files);
                 await this.fileSet.InitWrite();
-                this.chunks = this.fileSet.EnumerateChunks().ToArray();
-                this.written = new BitVector(this.chunks.LongCount());
-                this.writer = new ChunkWriter(this.chunks, this.written);
+                if (this.written == null)
+                {
+                    long countChunks = this.fileSet.EnumerateChunks().LongCount();
+                    this.written = new BitVector(countChunks);
+                }
+
+                this.writer = new ChunkWriter(this.fileSet.EnumerateChunks(), this.written);
                 this.log.Debug("Bytes remaining: " + this.BytesRemaining);
 
                 this.log.DebugFormat("Listening on {0}:{1}", response.MulticastAddress, response.MulticastPort);
@@ -328,22 +394,26 @@ namespace MS.MulticastDownloader.Core
             {
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
-                Task writeTask = null;
-                while (!this.tcpDownload && this.written.Contains(false))
+                while (!this.tcpDownload && !this.complete)
                 {
-                    this.token.ThrowIfCancellationRequested();
                     IEnumerable<FileSegment> received = await this.udpReader.ReceiveMulticast<FileSegment>(this.token);
-                    if (writeTask != null)
+                    FileSegment last = received.LastOrDefault();
+                    if (last != null)
                     {
-                        await writeTask;
+                        this.seqNum = new SeqNum(last.SegmentId);
                     }
 
-                    writeTask = this.writer.WriteSegments(received);
+                    if (this.writeTask != null)
+                    {
+                        await this.writeTask;
+                    }
+
+                    this.writeTask = this.writer.WriteSegments(received);
                 }
 
-                if (writeTask != null)
+                if (this.writeTask != null)
                 {
-                    await writeTask;
+                    await this.writeTask;
                 }
 
                 if (statusTask != null)
@@ -363,7 +433,7 @@ namespace MS.MulticastDownloader.Core
             {
                 this.log.Info("Waiting for TCP payload");
                 Task lastWrite = null;
-                while (this.written.Contains(false))
+                while (!this.complete)
                 {
                     FileSegment segment = await this.cliConn.Receive<FileSegment>(this.token);
                     if (lastWrite != null)
@@ -392,31 +462,26 @@ namespace MS.MulticastDownloader.Core
             {
                 try
                 {
-                    bool leavingSession = false;
-                    while (leavingSession = this.written.Contains(false))
+                    while (this.complete = !this.written.Contains(false))
                     {
-                        await Task.Delay(PacketUpdateInterval, this.token);
                         PacketStatusUpdate statusUpdate = new PacketStatusUpdate();
-                        long bytesLeft = 0;
-                        for (long i = 0; i < this.written.LongCount; ++i)
-                        {
-                            if (this.written[i])
-                            {
-                                bytesLeft += this.chunks[i].Block.Length;
-                            }
-                        }
-
+                        long bytesLeft = this.written.Count((v) => !v);
                         statusUpdate.BytesLeft = bytesLeft;
-                        statusUpdate.LeavingSession = leavingSession;
-                        this.log.Debug("Bytes left: " + bytesLeft + " Leaving session: " + leavingSession);
+                        statusUpdate.LeavingSession = this.complete;
+                        this.log.Debug("Bytes left: " + bytesLeft + " Leaving session: " + this.complete);
                         await this.cliConn.Send(statusUpdate, this.token);
                         Response resp = await this.CheckResponse<Response>();
                         if (resp.ResponseType == Session.ResponseId.WaveComplete)
                         {
                             this.log.Debug("Wave complete");
+                            if (this.writeTask != null)
+                            {
+                                await this.writeTask;
+                            }
+
                             WaveStatusUpdate waveUpdate = new WaveStatusUpdate();
                             waveUpdate.BytesLeft = bytesLeft;
-                            waveUpdate.LeavingSession = leavingSession;
+                            waveUpdate.LeavingSession = this.complete;
                             waveUpdate.FileBitVector = this.written.RawBits;
                             await this.cliConn.Send(waveUpdate, this.token);
                             WaveCompleteResponse waveResp = await this.CheckResponse<WaveCompleteResponse>();
@@ -426,6 +491,8 @@ namespace MS.MulticastDownloader.Core
                                 break;
                             }
                         }
+
+                        await Task.Delay(PacketUpdateInterval, this.token);
                     }
                 }
                 catch (Exception ex)
@@ -433,6 +500,36 @@ namespace MS.MulticastDownloader.Core
                     throw new SessionAbortedException(Resources.StatusUpdateFailed, ex);
                 }
             });
+        }
+
+        private async Task<bool> TryCleanFiles()
+        {
+            try
+            {
+                if (this.cliConn != null)
+                {
+                    await this.cliConn.Close();
+                }
+
+                if (this.udpReader != null)
+                {
+                    await this.udpReader.Close();
+                }
+
+                if (this.fileSet != null)
+                {
+                    await this.fileSet.Clean();
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                this.log.Warn("Failed to clean temporary files from disk.");
+                this.log.Debug(ex);
+            }
+
+            return false;
         }
 
         private async Task<T> CheckResponse<T>()

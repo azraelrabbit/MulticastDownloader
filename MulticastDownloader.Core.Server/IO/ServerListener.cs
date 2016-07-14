@@ -79,7 +79,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
         {
             Task<List<ServerConnection>> t0 = Task.Run(() =>
             {
-                this.clientConnectedEvent.WaitOne();
+                this.clientConnectedEvent.WaitOne(1000);
                 List<ServerConnection> ret = new List<ServerConnection>();
                 ServerConnection conn;
                 while (this.connections.TryDequeue(out conn))

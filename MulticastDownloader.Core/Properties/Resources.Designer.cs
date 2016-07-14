@@ -197,6 +197,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Server payload mismatch..
+        /// </summary>
+        internal static string ServerPayloadMismatch {
+            get {
+                return ResourceManager.GetString("ServerPayloadMismatch", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Session aborted..
         /// </summary>
         internal static string SessionAborted {

@@ -62,6 +62,15 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Attempt to add a duplicate connection to the server..
+        /// </summary>
+        internal static string AttemptToAddDuplicateConnection {
+            get {
+                return ResourceManager.GetString("AttemptToAddDuplicateConnection", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Certificate type mismatch: expected a private key file..
         /// </summary>
         internal static string CertificateTypeMismatch {
@@ -94,6 +103,15 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         internal static string MustSpecifyKeyFile {
             get {
                 return ResourceManager.GetString("MustSpecifyKeyFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Server session aborted..
+        /// </summary>
+        internal static string ServerAborted {
+            get {
+                return ResourceManager.GetString("ServerAborted", resourceCulture);
             }
         }
     }

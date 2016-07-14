@@ -35,6 +35,7 @@ namespace MS.MulticastDownloader.Core.IO
         {
             Contract.Requires(segments != null);
             Task lastWrite = null;
+            long lastSegment = long.MinValue;
             foreach (FileSegment segment in segments)
             {
                 Contract.Requires(segment.SegmentId >= 0 && segment.SegmentId < this.Count);
@@ -42,10 +43,10 @@ namespace MS.MulticastDownloader.Core.IO
                 {
                     FileChunk chunk = this.Chunks[segment.SegmentId];
                     Contract.Assert(segment.Data.Length == chunk.Block.Length);
-                    this.written[segment.SegmentId] = true;
                     if (lastWrite != null)
                     {
                         await lastWrite;
+                        this.written[lastSegment] = true;
                     }
 
                     if (chunk.Stream.Position != chunk.Block.Offset)
@@ -53,6 +54,7 @@ namespace MS.MulticastDownloader.Core.IO
                         await Task.Run(() => chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin));
                     }
 
+                    lastSegment = segment.SegmentId;
                     lastWrite = chunk.Stream.WriteAsync(segment.Data, 0, segment.Data.Length);
                 }
             }
@@ -60,6 +62,7 @@ namespace MS.MulticastDownloader.Core.IO
             if (lastWrite != null)
             {
                 await lastWrite;
+                this.written[lastSegment] = true;
             }
         }
     }

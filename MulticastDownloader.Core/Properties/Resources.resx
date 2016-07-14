@@ -162,6 +162,9 @@
   <data name="RequestFailed" xml:space="preserve">
     <value>Request failed.</value>
   </data>
+  <data name="ServerPayloadMismatch" xml:space="preserve">
+    <value>Server payload mismatch.</value>
+  </data>
   <data name="SessionAborted" xml:space="preserve">
     <value>Session aborted.</value>
   </data>

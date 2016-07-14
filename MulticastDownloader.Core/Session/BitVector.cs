@@ -11,8 +11,10 @@ namespace MS.MulticastDownloader.Core.Session
     using System.Linq;
     using System.Threading.Tasks;
 
-    // Internal implementation for a binary bitmap.
-    internal class BitVector : IList<bool>
+    /// <summary>
+    /// Represent a file transfer bitmap.
+    /// </summary>
+    public class BitVector : IList<bool>
     {
         internal BitVector(long length)
         {
@@ -43,6 +45,9 @@ namespace MS.MulticastDownloader.Core.Session
             }
         }
 
+        /// <summary>
+        /// Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1" /> is read-only.
+        /// </summary>
         public bool IsReadOnly
         {
             get
@@ -51,14 +56,22 @@ namespace MS.MulticastDownloader.Core.Session
             }
         }
 
-        // Raw read the bitmap
-        internal byte[] RawBits
+        /// <summary>
+        /// Gets the raw bits.
+        /// </summary>
+        /// <value>
+        /// The raw bits.
+        /// </value>
+        public byte[] RawBits
         {
             get;
             private set;
         }
 
-        internal long LongCount
+        /// <summary>
+        /// Gets the number of elements contained in the <see cref="T:System.Collections.Generic.ICollection`1" />.
+        /// </summary>
+        public long LongCount
         {
             get;
             private set;
@@ -85,7 +98,15 @@ namespace MS.MulticastDownloader.Core.Session
             }
         }
 
-        internal bool this[long index]
+        /// <summary>
+        /// Gets or sets the <see cref="bool"/> at the specified index.
+        /// </summary>
+        /// <value>
+        /// The <see cref="bool"/>.
+        /// </value>
+        /// <param name="index">The index.</param>
+        /// <returns>A boolean for the specified index.</returns>
+        public bool this[long index]
         {
             get
             {
@@ -114,7 +135,7 @@ namespace MS.MulticastDownloader.Core.Session
         /// </summary>
         /// <param name="vectors">The vectors to union.</param>
         /// <returns>A <see cref="BitVector"/> containing the union of all sub-vector values.</returns>
-        public static async Task<BitVector> UnionOf(ICollection<BitVector> vectors)
+        public static BitVector IntersectOf(ICollection<BitVector> vectors)
         {
             BitVector first = vectors.FirstOrDefault();
             if (vectors == null || first == null)
@@ -124,16 +145,13 @@ namespace MS.MulticastDownloader.Core.Session
 
             long countBits = first.RawBits.LongCount();
             BitVector ret = new BitVector(first.LongCount);
-            await Task.Run(() =>
+            for (long r = 0; r < countBits; ++r)
             {
-                Parallel.For(0, countBits, (r, s) =>
+                foreach (BitVector bv in vectors)
                 {
-                    foreach (BitVector bv in vectors)
-                    {
-                        ret.RawBits[r] |= bv.RawBits[r];
-                    }
-                });
-            });
+                    ret.RawBits[r] &= bv.RawBits[r];
+                }
+            }
 
             return ret;
         }
@@ -170,24 +188,24 @@ namespace MS.MulticastDownloader.Core.Session
         {
             long longCount = this.RawBits.LongCount();
             int remainder = 8 - (int)(this.LongCount % 8);
-            byte uMask = 0;
-            Parallel.For(0, longCount, (i) =>
+            int uMask = 0;
+            for (long i = 0; i < longCount; ++i)
             {
-                byte valid = 0xFF;
+                int valid = 0xFF;
                 if (i == longCount - 1)
                 {
-                    valid = (byte)(0xFF >> remainder);
+                    valid = 0xFF >> remainder;
                 }
 
                 if (item)
                 {
-                    uMask |= (byte)(this.RawBits[i] & valid);
+                    uMask |= this.RawBits[i] & valid;
                 }
                 else
                 {
-                    uMask |= (byte)(~this.RawBits[i] & valid);
+                    uMask |= ~this.RawBits[i] & valid;
                 }
-            });
+            }
 
             return uMask > 0;
         }
@@ -273,6 +291,12 @@ namespace MS.MulticastDownloader.Core.Session
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Returns an enumerator that iterates through a collection.
+        /// </summary>
+        /// <returns>
+        /// An <see cref="T:System.Collections.IEnumerator" /> object that can be used to iterate through the collection.
+        /// </returns>
         IEnumerator IEnumerable.GetEnumerator()
         {
             return this.GetEnumerator();
