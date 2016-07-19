@@ -8,13 +8,17 @@ namespace MS.MulticastDownloader.Core.Server
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Globalization;
+    using System.IO;
     using System.Linq;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
+    using Core.Cryptography;
+    using Core.Session;
     using Cryptography;
     using IO;
+    using Org.BouncyCastle.Security;
     using Properties;
     using Session;
 
@@ -35,6 +39,7 @@ namespace MS.MulticastDownloader.Core.Server
         private List<MulticastSession> sessions = new List<MulticastSession>();
         private AutoResetEvent joinEvent = new AutoResetEvent(false);
         private ServerListener listener;
+        private HashEncoderFactory encoderFactory;
         private CancellationToken token = CancellationToken.None;
         private bool listening;
         private bool disposed;
@@ -62,6 +67,10 @@ namespace MS.MulticastDownloader.Core.Server
             this.Settings = settings;
             this.ServerSettings = serverSettings;
             this.listener = new ServerListener(this.Parameters, settings, serverSettings);
+            SecureRandom sr = new SecureRandom();
+            this.ChallengeKey = new byte[MulticastClient.EncoderSize / 8];
+            sr.NextBytes(this.ChallengeKey);
+            this.encoderFactory = new HashEncoderFactory(this.ChallengeKey, MulticastClient.EncoderSize);
         }
 
         /// <summary>
@@ -134,10 +143,24 @@ namespace MS.MulticastDownloader.Core.Server
             private set;
         }
 
+        internal byte[] ChallengeKey
+        {
+            get;
+            private set;
+        }
+
         internal int BurstDelayMs
         {
             get;
             private set;
+        }
+
+        internal IEncoderFactory EncoderFactory
+        {
+            get
+            {
+                return this.encoderFactory;
+            }
         }
 
         /// <summary>
@@ -183,7 +206,6 @@ namespace MS.MulticastDownloader.Core.Server
                                 this.token.ThrowIfCancellationRequested();
                                 await this.TransmitUdp(waveSessions);
                                 await this.WaveUpdate();
-                                await this.TransmitTcp(waveSessions, connectionsBySessionId);
                             }
                         }
                     }
@@ -206,11 +228,6 @@ namespace MS.MulticastDownloader.Core.Server
                     this.listening = false;
                 }
             });
-        }
-
-        internal Task<int> GetSessionId(string path)
-        {
-            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -258,27 +275,60 @@ namespace MS.MulticastDownloader.Core.Server
                 ICollection<ServerConnection> conns = await this.listener.ReceiveConnections(this.token);
                 foreach (ServerConnection conn in conns)
                 {
-                    MulticastConnection mcConn = new MulticastConnection(this, conn);
-                    try
+                    using (CancellationTokenSource timeoutCts = new CancellationTokenSource())
+                    using (CancellationTokenRegistration sessionTokenCanceller = this.token.Register(() => timeoutCts.Cancel()))
+                    using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
                     {
-                        await mcConn.AcceptConnection(this.token);
-                    }
-                    catch (Exception ex)
-                    {
-                        this.log.Warn("Client connection failed");
-                        this.log.Warn(ex.Message);
-                        continue;
-                    }
-
-                    lock (this.connectionLock)
-                    {
-                        if (this.connections.Contains(mcConn))
+                        CancellationToken timeoutToken = timeoutCts.Token;
+                        MulticastConnection mcConn = new MulticastConnection(this, conn);
+                        string path;
+                        timeoutCts.CancelAfter(ResponseDelay);
+                        try
                         {
-                            throw new InvalidOperationException(Resources.AttemptToAddDuplicateConnection);
+                            path = await mcConn.AcceptConnection(timeoutToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            this.log.Warn("Client connection failed");
+                            this.log.Warn(ex.Message);
+                            continue;
                         }
 
-                        this.connections.Add(mcConn);
-                        this.joinEvent.Set();
+                        MulticastSession session;
+                        try
+                        {
+                            session = await this.GetSession(path);
+                        }
+                        catch (Exception ex)
+                        {
+                            this.log.Warn("Retrieving multicast session failed: " + ex.Message);
+                            this.log.Warn(ex.Message);
+                            await mcConn.SessionJoinFailed(timeoutToken, ex);
+                            continue;
+                        }
+
+                        timeoutCts.CancelAfter(ResponseDelay);
+                        try
+                        {
+                            await mcConn.JoinSession(session, timeoutToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            this.log.Warn("Session join failed");
+                            this.log.Warn(ex.Message);
+                            continue;
+                        }
+
+                        lock (this.connectionLock)
+                        {
+                            if (this.connections.Contains(mcConn))
+                            {
+                                throw new InvalidOperationException(Resources.AttemptToAddDuplicateConnection);
+                            }
+
+                            this.connections.Add(mcConn);
+                            this.joinEvent.Set();
+                        }
                     }
                 }
             }
@@ -300,10 +350,10 @@ namespace MS.MulticastDownloader.Core.Server
                 else
                 {
                     newConns.Add(conn);
-                    ICollection<MulticastConnection> connectionBag = connectionsBySessionId[conn.SessionId];
+                    ICollection<MulticastConnection> connectionBag = connectionsBySessionId[conn.Session.SessionId];
                     if (connectionBag == null)
                     {
-                        connectionBag = connectionsBySessionId[conn.SessionId] = new List<MulticastConnection>(this.connections.Count);
+                        connectionBag = connectionsBySessionId[conn.Session.SessionId] = new List<MulticastConnection>(this.connections.Count);
                     }
 
                     connectionBag.Add(conn);
@@ -359,12 +409,24 @@ namespace MS.MulticastDownloader.Core.Server
                         finalUpdate = true;
                     }
 
-                    // FIXMEFIXME: update burst delay
-
                     await this.RespondToClients<PacketStatusUpdate, Response>((psu, mc, token) =>
                     {
-                        return mc.UpdatePacketStatus(psu, finalUpdate, token);
+                        DateTime when = DateTime.Now;
+                        mc.UpdatePacketStatus(psu, when, token);
+                        Response response = new Response();
+                        response.ResponseType = finalUpdate ? ResponseId.WaveComplete : ResponseId.Ok;
+                        return response;
                     });
+
+                    lock (this.sessionLock)
+                    {
+                        this.sessions.AsParallel().ForAll((ms) =>
+                        {
+                            DateTime when = DateTime.Now;
+
+                        });
+                    }
+                    // FIXMEFIXME: update burst delay
                 }
             }
         }
@@ -373,8 +435,15 @@ namespace MS.MulticastDownloader.Core.Server
         {
             await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>((wsu, mc, token) =>
             {
-                return mc.UpdateWaveStatus(wsu, token);
+                DateTime when = DateTime.Now;
+                mc.UpdateWaveStatus(wsu, when, token);
+                WaveCompleteResponse response = new WaveCompleteResponse();
+                response.ResponseType = ResponseId.Ok;
+                response.WaveNumber = mc.Session.WaveNumber;
+                return response;
             });
+
+            // FIXMEFIXME: update burst delay
         }
 
         // Read a request from each client, and send a response back. Completes when all clients are responded to, or when the built-in response delay completes.
@@ -388,7 +457,8 @@ namespace MS.MulticastDownloader.Core.Server
                 object listLock = new object();
                 List<MulticastConnection> failedConnections = new List<MulticastConnection>();
                 using (CancellationTokenSource timeoutCts = new CancellationTokenSource(ResponseDelay))
-                using (CancellationTokenRegistration statusCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
+                using (CancellationTokenRegistration sessionTokenCanceller = this.token.Register(() => timeoutCts.Cancel()))
+                using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
                 {
                     CancellationToken timeoutToken = timeoutCts.Token;
                     conns.AsParallel().ForAll(async (mc) =>
@@ -445,24 +515,15 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        private async Task TransmitTcp(ICollection<MulticastSession> sessions, IDictionary<int, ICollection<MulticastConnection>> connectionsBySessionId)
-        {
-            foreach (MulticastSession session in sessions)
-            {
-                foreach (MulticastConnection conn in connectionsBySessionId[session.SessionId])
-                {
-                    if (conn.TcpDownload)
-                    {
-                        await conn.TransmitTcp(session, this.token);
-                    }
-                }
-            }
-        }
-
         private void CancelListen()
         {
             this.listening = false;
             this.joinEvent.Set();
+        }
+
+        private Task<MulticastSession> GetSession(string path)
+        {
+            throw new NotImplementedException();
         }
     }
 }

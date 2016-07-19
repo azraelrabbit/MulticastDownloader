@@ -35,10 +35,9 @@ namespace MS.MulticastDownloader.Core
         private ClientConnection cliConn;
         private ChunkWriter writer;
         private UdpReader udpReader;
-        private SeqNum seqNum;
+        private BoxedLong seqNum;
         private Task writeTask = null;
         private int state;
-        private bool tcpDownload = false;
         private bool canReconnect;
         private bool disposedValue = false;
         private bool complete = false;
@@ -180,14 +179,26 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                SeqNum seq = this.seqNum;
+                BoxedLong seq = this.seqNum;
                 if (seq != null)
                 {
-                    return seq.Seq;
+                    return seq.Value;
                 }
 
                 return 0;
             }
+        }
+
+        /// <summary>
+        /// Gets the current wave number in the download.
+        /// </summary>
+        /// <value>
+        /// The wave number.
+        /// </value>
+        public long WaveNumber
+        {
+            get;
+            private set;
         }
 
         /// <summary>
@@ -226,12 +237,6 @@ namespace MS.MulticastDownloader.Core
 
                         // Now begin processing received packets and transmitting them back to the service.
                         await this.MulticastDownload();
-
-                        // Finally, if we're receiving the rest of our payload through TCP, download it here.
-                        if (this.tcpDownload)
-                        {
-                            await this.TcpDownload();
-                        }
 
                         await this.writer.Flush();
                         this.log.Info("Transfer complete");
@@ -319,7 +324,7 @@ namespace MS.MulticastDownloader.Core
                     psk = decoder.Decode(challenge.ChallengeKey);
                 }
 
-                this.log.Debug("Challenge: " + Convert.ToBase64String(challenge.ChallengeKey) + " PSK: " + Convert.ToBase64String(psk));
+                this.log.Debug("Challenge: " + Convert.ToBase64String(challenge.ChallengeKey));
                 if (this.Parameters.UseTls)
                 {
                     // We use TLS to secure the connection before sending back the decoded response.
@@ -339,7 +344,6 @@ namespace MS.MulticastDownloader.Core
                     response.ChallengeKey = ResponseId;
                 }
 
-                this.log.Debug("Challenge Response: " + Convert.ToBase64String(response.ChallengeKey));
                 await this.cliConn.Send(response, this.token);
 
                 Response authResponse = await this.CheckResponse<Response>();
@@ -380,6 +384,8 @@ namespace MS.MulticastDownloader.Core
                 this.log.Debug("Bytes remaining: " + this.BytesRemaining);
 
                 this.log.DebugFormat("Listening on {0}:{1}", response.MulticastAddress, response.MulticastPort);
+                this.WaveNumber = response.WaveNumber;
+                this.log.Debug("Starting wave: " + this.WaveNumber);
                 this.udpReader = await this.cliConn.JoinMulticastServer(response, this.fileEncoder);
             }
             catch (Exception ex)
@@ -394,13 +400,13 @@ namespace MS.MulticastDownloader.Core
             {
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
-                while (!this.tcpDownload && !this.complete)
+                while (!this.complete)
                 {
-                    IEnumerable<FileSegment> received = await this.udpReader.ReceiveMulticast<FileSegment>(this.token);
+                    List<FileSegment> received = new List<FileSegment>(await this.udpReader.ReceiveMulticast<FileSegment>(this.token));
                     FileSegment last = received.LastOrDefault();
                     if (last != null)
                     {
-                        this.seqNum = new SeqNum(last.SegmentId);
+                        this.seqNum = new BoxedLong(last.SegmentId);
                     }
 
                     if (this.writeTask != null)
@@ -427,34 +433,6 @@ namespace MS.MulticastDownloader.Core
             }
         }
 
-        private async Task TcpDownload()
-        {
-            try
-            {
-                this.log.Info("Waiting for TCP payload");
-                Task lastWrite = null;
-                while (!this.complete)
-                {
-                    FileSegment segment = await this.cliConn.Receive<FileSegment>(this.token);
-                    if (lastWrite != null)
-                    {
-                        await lastWrite;
-                    }
-
-                    lastWrite = this.writer.WriteSegments(new FileSegment[] { segment });
-                }
-
-                if (lastWrite != null)
-                {
-                    await lastWrite;
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new SessionAbortedException(Resources.TcpDownloadFailed, ex);
-            }
-        }
-
         // Returns true if the wave completed
         private Task UpdateStatus()
         {
@@ -468,7 +446,7 @@ namespace MS.MulticastDownloader.Core
                         long bytesLeft = this.written.Count((v) => !v);
                         statusUpdate.BytesLeft = bytesLeft;
                         statusUpdate.LeavingSession = this.complete;
-                        this.log.Debug("Bytes left: " + bytesLeft + " Leaving session: " + this.complete);
+                        this.log.Debug("Sequence: " + this.SequenceNumber + "  Bytes left: " + bytesLeft + "  Leaving session: " + this.complete);
                         await this.cliConn.Send(statusUpdate, this.token);
                         Response resp = await this.CheckResponse<Response>();
                         if (resp.ResponseType == Session.ResponseId.WaveComplete)
@@ -485,11 +463,8 @@ namespace MS.MulticastDownloader.Core
                             waveUpdate.FileBitVector = this.written.RawBits;
                             await this.cliConn.Send(waveUpdate, this.token);
                             WaveCompleteResponse waveResp = await this.CheckResponse<WaveCompleteResponse>();
-                            this.tcpDownload = waveResp.DirectDownload;
-                            if (this.tcpDownload)
-                            {
-                                break;
-                            }
+                            this.WaveNumber = waveResp.WaveNumber;
+                            this.log.Debug("New wave: " + this.WaveNumber);
                         }
 
                         await Task.Delay(PacketUpdateInterval, this.token);

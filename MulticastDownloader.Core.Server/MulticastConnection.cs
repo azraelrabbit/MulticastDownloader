@@ -7,11 +7,14 @@ namespace MS.MulticastDownloader.Core.Server
     using System;
     using System.Collections.Generic;
     using System.Diagnostics.Contracts;
+    using System.IO;
     using System.Linq;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
+    using Core.Cryptography;
+    using Core.Session;
     using Cryptography;
     using IO;
     using Properties;
@@ -23,11 +26,12 @@ namespace MS.MulticastDownloader.Core.Server
     /// <seealso cref="ServerBase" />
     public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>
     {
+        private const int MaxIntervals = 10;
+
         private ILog log = LogManager.GetLogger<MulticastConnection>();
+        private BoxedLong bytesPerSecond;
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MaxIntervals);
         private BitVector written;
-        private ChunkReader reader;
-        private UdpWriter writer;
-        private bool listening;
         private bool disposed;
 
         internal MulticastConnection(MulticastServer server, ServerConnection serverConn)
@@ -101,6 +105,26 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
+        /// <summary>
+        /// Gets the bytes per second.
+        /// </summary>
+        /// <value>
+        /// The bytes per second.
+        /// </value>
+        public long BytesPerSecond
+        {
+            get
+            {
+                BoxedLong bps = this.bytesPerSecond;
+                if (bps != null)
+                {
+                    return bps.Value;
+                }
+
+                return 0;
+            }
+        }
+
         internal ServerConnection ServerConnection
         {
             get;
@@ -113,25 +137,25 @@ namespace MS.MulticastDownloader.Core.Server
             private set;
         }
 
+        internal DateTime WhenJoined
+        {
+            get;
+            set;
+        }
+
         internal DateTime WhenExpires
         {
             get;
             set;
         }
 
-        internal int SessionId
+        internal MulticastSession Session
         {
             get;
             private set;
         }
 
         internal bool LeavingSession
-        {
-            get;
-            private set;
-        }
-
-        internal bool TcpDownload
         {
             get;
             private set;
@@ -191,44 +215,109 @@ namespace MS.MulticastDownloader.Core.Server
         /// </returns>
         public override string ToString()
         {
-            return "[" + this.SessionId + "]" + (this.RemoteAddress ?? string.Empty) + ":" + this.RemotePort;
+            return "[" + (this.Session != null ? this.Session.SessionId.ToString() : string.Empty) + "]" + (this.RemoteAddress ?? string.Empty) + ":" + this.RemotePort;
         }
 
-        internal Task<SessionJoinRequest> AcceptConnection(CancellationToken token)
+        internal async Task<string> AcceptConnection(CancellationToken token)
         {
-            throw new NotImplementedException();
+            Challenge challenge = new Challenge();
+            if (this.Server.Settings.Encoder != null)
+            {
+                IEncoder encoder = this.Server.Settings.Encoder.CreateEncoder();
+                challenge.ChallengeKey = encoder.Encode(this.Server.ChallengeKey);
+            }
+
+            await this.ServerConnection.Send(challenge, token);
+            if (this.Server.Parameters.UseTls)
+            {
+                // We use TLS to secure the connection before sending back the decoded response.
+                this.ServerConnection.AcceptTls(this.Server.ChallengeKey);
+            }
+
+            ChallengeResponse challengeResponse = await this.ServerConnection.Receive<ChallengeResponse>(token);
+            Response authResponse = new Response();
+            authResponse.ResponseType = ResponseId.Ok;
+            if (challenge.ChallengeKey != null)
+            {
+                this.log.Debug("Authenticating challenge");
+                IDecoder decoder = this.Server.EncoderFactory.CreateDecoder();
+                byte[] responsePhrase = decoder.Decode(challengeResponse.ChallengeKey);
+                if (!responsePhrase.SequenceEqual(MulticastClient.ResponseId))
+                {
+                    authResponse.ResponseType = ResponseId.AccessDenied;
+                    authResponse.Message = Resources.AuthenticationFailed;
+                }
+            }
+
+            await this.ServerConnection.Send(authResponse, token);
+            authResponse.ThrowIfFailed();
+            this.log.Info("Connection from " + this + " accepted.");
+
+            SessionJoinRequest request = await this.ServerConnection.Receive<SessionJoinRequest>(token);
+            this.log.InfoFormat("Payload '{0}' requested with state: {1}", request.Path, request.State);
+            this.State = request.State;
+            return request.Path;
         }
 
-        internal Task TransmitTcp(MulticastSession session, CancellationToken token)
+        internal async Task JoinSession(MulticastSession session, CancellationToken timeoutToken)
         {
-            throw new NotImplementedException();
+            DateTime now = DateTime.Now;
+            this.throughputCalculator.Start(session.TotalBytes, now);
+            this.WhenJoined = now;
+            this.bytesPerSecond = new BoxedLong(0);
+            this.WhenExpires = now + this.Server.Settings.ReadTimeout;
+            this.Session = session;
+            SessionJoinResponse sjr = new SessionJoinResponse();
+            sjr.ResponseType = ResponseId.Ok;
+            sjr.Ipv6 = this.Server.ServerSettings.Ipv6;
+            sjr.MulticastAddress = session.MulticastAddress;
+            sjr.MulticastPort = session.MulticastPort;
+            sjr.Files = session.FileHeaders.ToArray();
+            sjr.WaveNumber = session.WaveNumber;
+            this.log.DebugFormat("SJR: " + sjr.MulticastAddress + ":" + sjr.MulticastPort + "; " + sjr.CountSegments + " segments, session id: " + this.Session.SessionId + ", wave: " + sjr.WaveNumber);
+            this.written = new BitVector(session.CountChunks);
+            await this.ServerConnection.Send(sjr, timeoutToken);
         }
 
-        internal Response UpdatePacketStatus(PacketStatusUpdate psu, bool waveComplete, CancellationToken token)
+        internal async Task SessionJoinFailed(CancellationToken timeoutToken, Exception ex)
         {
-            throw new NotImplementedException();
-            //mc.UpdateBytesLeft(psu.BytesLeft, psu.LeavingSession);
-            //Response response = new Response();
-            //if (waveComplete)
-            //{
-            //    response.ResponseType = ResponseId.WaveComplete;
-            //}
-            //else
-            //{
-            //    response.ResponseType = ResponseId.Ok;
-            //}
+            SessionJoinResponse sjr = new SessionJoinResponse();
+            if (ex is FileNotFoundException)
+            {
+                sjr.ResponseType = ResponseId.PathNotFound;
+            }
+            else if (ex is InvalidOperationException)
+            {
+                sjr.ResponseType = ResponseId.InvalidOperation;
+            }
+            else
+            {
+                sjr.ResponseType = ResponseId.Failed;
+            }
 
-            //return response;
+            sjr.Message = ex.Message;
+            this.log.Error("Join failed: " + sjr.ResponseType + " (" + sjr.Message + ")");
+            await this.ServerConnection.Send(sjr, timeoutToken);
         }
 
-        internal WaveCompleteResponse UpdateWaveStatus(WaveStatusUpdate wsu, CancellationToken token)
+        internal void UpdatePacketStatus(PacketStatusUpdate psu, DateTime when, CancellationToken token)
         {
-            throw new NotImplementedException();
-            //WaveCompleteResponse response = new WaveCompleteResponse();
-            //mc.UpdateWave(wsu.BytesLeft, wsu.FileBitVector, wsu.LeavingSession);
-            //response.DirectDownload = mc.TcpDownload;
-            //response.ResponseType = ResponseId.Ok;
-            //return response;
+            this.WhenExpires = when + this.Server.Settings.ReadTimeout;
+            long average = this.throughputCalculator.UpdateThroughput(psu.BytesLeft, when);
+            this.bytesPerSecond = new BoxedLong(average);
+            this.log.Debug("[" + this + "] Bytes left: " + psu.BytesLeft + ", bytes per second: " + average);
+            if (psu.LeavingSession && this.LeavingSession != psu.LeavingSession)
+            {
+                this.LeavingSession = psu.LeavingSession;
+                this.log.Debug("[" + this + "] leaving session");
+            }
+        }
+
+        internal void UpdateWaveStatus(WaveStatusUpdate wsu, DateTime when, CancellationToken token)
+        {
+            this.UpdatePacketStatus(wsu, when, token);
+            long len = this.written.Count;
+            this.written = new BitVector(len, wsu.FileBitVector);
         }
 
         internal async Task Close()
@@ -253,11 +342,6 @@ namespace MS.MulticastDownloader.Core.Server
                     if (this.ServerConnection != null)
                     {
                         this.ServerConnection.Dispose();
-                    }
-
-                    if (this.writer != null)
-                    {
-                        this.writer.Dispose();
                     }
                 }
             }

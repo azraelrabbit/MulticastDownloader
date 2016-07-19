@@ -107,5 +107,13 @@ namespace MS.MulticastDownloader.Core.Server
         /// The maximum bytes per second.
         /// </value>
         long MaxBytesPerSecond { get; }
+
+        /// <summary>
+        /// Gets the delay calculation used to compute the burst delay.
+        /// </summary>
+        /// <value>
+        /// The delay calculation.
+        /// </value>
+        DelayCalculation DelayCalculation { get; }
     }
 }

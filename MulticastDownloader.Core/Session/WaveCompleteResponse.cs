@@ -9,8 +9,8 @@ namespace MS.MulticastDownloader.Core.Session
     [ProtoContract]
     internal class WaveCompleteResponse : Response
     {
-        // True if the server is transmitting the rest of the session blocks to the client
+        // The next wave number.
         [ProtoMember(1)]
-        internal bool DirectDownload { get; set; }
+        internal long WaveNumber { get; set; }
     }
 }

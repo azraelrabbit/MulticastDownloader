@@ -71,6 +71,15 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Authentication failed..
+        /// </summary>
+        internal static string AuthenticationFailed {
+            get {
+                return ResourceManager.GetString("AuthenticationFailed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Certificate type mismatch: expected a private key file..
         /// </summary>
         internal static string CertificateTypeMismatch {

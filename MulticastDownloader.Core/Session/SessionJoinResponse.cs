@@ -32,6 +32,9 @@ namespace MS.MulticastDownloader.Core.Session
         [ProtoMember(6)]
         internal FileHeader[] Files { get; set; }
 
+        [ProtoMember(7)]
+        internal long WaveNumber { get; set; }
+
         internal long CountSegments
         {
             get

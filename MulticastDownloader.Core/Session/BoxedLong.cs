@@ -1,17 +1,17 @@
-﻿// <copyright file="SeqNum.cs" company="MS">
+﻿// <copyright file="BoxedLong.cs" company="MS">
 // Copyright (c) 2016 MS.
 // </copyright>
 
 namespace MS.MulticastDownloader.Core.Session
 {
-    internal class SeqNum
+    internal class BoxedLong
     {
-        internal SeqNum(long seq)
+        internal BoxedLong(long seq)
         {
-            this.Seq = seq;
+            this.Value = seq;
         }
 
-        internal long Seq
+        internal long Value
         {
             get;
             private set;

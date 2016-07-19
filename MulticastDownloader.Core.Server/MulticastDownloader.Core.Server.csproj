@@ -54,6 +54,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Cryptography\ITcpSocketClientExtensions.cs" />
+    <Compile Include="DelayCalculation.cs" />
     <Compile Include="IMulticastServerSettings.cs" />
     <Compile Include="IO\ChunkReader.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
@@ -72,6 +73,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="ServerBase.cs" />
+    <Compile Include="Session\ThroughputCalculator.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj">

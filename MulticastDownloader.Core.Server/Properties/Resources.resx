@@ -120,6 +120,9 @@
   <data name="AttemptToAddDuplicateConnection" xml:space="preserve">
     <value>Attempt to add a duplicate connection to the server.</value>
   </data>
+  <data name="AuthenticationFailed" xml:space="preserve">
+    <value>Authentication failed.</value>
+  </data>
   <data name="CertificateTypeMismatch" xml:space="preserve">
     <value>Certificate type mismatch: expected a private key file.</value>
   </data>
