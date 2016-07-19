@@ -165,7 +165,7 @@ namespace MS.MulticastDownloader.Core.Server
         {
             if (other != null && this != other)
             {
-                return string.Compare(this.RemoteAddress, other.RemoteAddress) == 0
+                return string.Compare(this.RemoteAddress, other.RemoteAddress, StringComparison.Ordinal) == 0
                     && this.RemotePort == other.RemotePort;
             }
 

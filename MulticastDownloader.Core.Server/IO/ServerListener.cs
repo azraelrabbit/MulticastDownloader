@@ -99,6 +99,8 @@ namespace MS.MulticastDownloader.Core.Server.IO
         /// Releases unmanaged and - optionally - managed resources.
         /// </summary>
         /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        //// Listener can't be disposed as there's a chance it'll throw an ODE (this is probably a bug in TcpListener)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Usage", "CA2213:DisposableFieldsShouldBeDisposed", MessageId = "listener", Justification = "none")]
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);

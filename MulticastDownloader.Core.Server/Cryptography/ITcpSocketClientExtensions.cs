@@ -6,6 +6,7 @@ namespace MS.MulticastDownloader.Core.Server.Cryptography
 {
     using System;
     using System.Diagnostics.Contracts;
+    using System.Globalization;
     using System.IO;
     using System.Linq;
     using System.Text;
@@ -57,7 +58,7 @@ namespace MS.MulticastDownloader.Core.Server.Cryptography
 
             public override void NotifyAlertRaised(byte alertLevel, byte alertDescription, string message, Exception cause)
             {
-                using (StringWriter sw = new StringWriter())
+                using (StringWriter sw = new StringWriter(CultureInfo.InvariantCulture))
                 {
                     sw.WriteLine("TLS-PSK server raised alert: " + AlertLevel.GetText(alertLevel) + ", " + AlertDescription.GetText(alertDescription));
                     if (message != null)
@@ -76,7 +77,7 @@ namespace MS.MulticastDownloader.Core.Server.Cryptography
 
             public override void NotifyAlertReceived(byte alertLevel, byte alertDescription)
             {
-                using (StringWriter sw = new StringWriter())
+                using (StringWriter sw = new StringWriter(CultureInfo.InvariantCulture))
                 {
                     sw.WriteLine("TLS-PSK server received alert: " + AlertLevel.GetText(alertLevel) + ", " + AlertDescription.GetText(alertDescription));
                     this.LogAlert(alertLevel, sw);

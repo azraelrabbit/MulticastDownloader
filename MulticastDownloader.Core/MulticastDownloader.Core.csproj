@@ -30,6 +30,7 @@
     <CodeAnalysisRuleSet>MulticastDownloader.Core.ruleset</CodeAnalysisRuleSet>
     <NoWarn>
     </NoWarn>
+    <RunCodeAnalysis>false</RunCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>

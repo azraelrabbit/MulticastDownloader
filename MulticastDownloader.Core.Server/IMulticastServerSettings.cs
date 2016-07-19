@@ -99,5 +99,13 @@ namespace MS.MulticastDownloader.Core.Server
         /// The maximum sessions.
         /// </value>
         int MaxSessions { get; }
+
+        /// <summary>
+        /// Gets the maximum bytes per second for the multicast download.
+        /// </summary>
+        /// <value>
+        /// The maximum bytes per second.
+        /// </value>
+        long MaxBytesPerSecond { get; }
     }
 }

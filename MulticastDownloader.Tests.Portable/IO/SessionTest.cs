@@ -335,6 +335,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 this.MaxConnectionsPerSession = 10;
                 this.MaxSessions = 10;
                 this.MulticastStartPort = 0xFF00;
+                this.MaxBytesPerSecond = long.MaxValue;
                 if (ipv6)
                 {
                     this.MulticastAddress = "FF01::1";
@@ -353,6 +354,12 @@ namespace MS.MulticastDownloader.Tests.IO
             }
 
             public bool Ipv6
+            {
+                get;
+                set;
+            }
+
+            public long MaxBytesPerSecond
             {
                 get;
                 set;

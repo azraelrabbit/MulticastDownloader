@@ -6,6 +6,7 @@ namespace MS.MulticastDownloader.Core.IO
 {
     using System;
     using System.Diagnostics.Contracts;
+    using System.Globalization;
     using System.IO;
     using System.Threading;
     using System.Threading.Tasks;
@@ -49,7 +50,7 @@ namespace MS.MulticastDownloader.Core.IO
 
         internal virtual Task Close()
         {
-            return Task.Run(() => this.log.DebugFormat("{0}: Closing connection...", this.GetType()));
+            return Task.Run(() => this.log.DebugFormat(CultureInfo.InvariantCulture, "{0}: Closing connection...", this.GetType()));
         }
 
         /// <summary>

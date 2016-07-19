@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Core.Server
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Text;
     using System.Threading;
@@ -207,7 +208,7 @@ namespace MS.MulticastDownloader.Core.Server
             });
         }
 
-        internal async Task<int> GetSessionId(string path)
+        internal Task<int> GetSessionId(string path)
         {
             throw new NotImplementedException();
         }
@@ -237,6 +238,11 @@ namespace MS.MulticastDownloader.Core.Server
                     if (this.listener != null)
                     {
                         this.listener.Dispose();
+                    }
+
+                    if (this.joinEvent != null)
+                    {
+                        this.joinEvent.Dispose();
                     }
                 }
 
@@ -335,8 +341,8 @@ namespace MS.MulticastDownloader.Core.Server
                 waveTotal += session.TotalBytes;
             }
 
-            this.log.DebugFormat("Bytes remaining: {0}", waveRemaining);
-            this.log.DebugFormat("Bytes total: {0}", waveTotal);
+            this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes remaining: {0}", waveRemaining);
+            this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes total: {0}", waveTotal);
             return sessions;
         }
 
