@@ -19,8 +19,8 @@ namespace MS.MulticastDownloader.Core.Server
     using Cryptography;
     using IO;
     using Org.BouncyCastle.Security;
+    using PCLStorage;
     using Properties;
-    using Session;
 
     /// <summary>
     /// Represent a multicast server.
@@ -417,16 +417,6 @@ namespace MS.MulticastDownloader.Core.Server
                         response.ResponseType = finalUpdate ? ResponseId.WaveComplete : ResponseId.Ok;
                         return response;
                     });
-
-                    lock (this.sessionLock)
-                    {
-                        this.sessions.AsParallel().ForAll((ms) =>
-                        {
-                            DateTime when = DateTime.Now;
-
-                        });
-                    }
-                    // FIXMEFIXME: update burst delay
                 }
             }
         }
@@ -440,10 +430,9 @@ namespace MS.MulticastDownloader.Core.Server
                 WaveCompleteResponse response = new WaveCompleteResponse();
                 response.ResponseType = ResponseId.Ok;
                 response.WaveNumber = mc.Session.WaveNumber;
+                response.ReceptionRate = mc.ReceptionRate;
                 return response;
             });
-
-            // FIXMEFIXME: update burst delay
         }
 
         // Read a request from each client, and send a response back. Completes when all clients are responded to, or when the built-in response delay completes.
@@ -521,9 +510,56 @@ namespace MS.MulticastDownloader.Core.Server
             this.joinEvent.Set();
         }
 
-        private Task<MulticastSession> GetSession(string path)
+        private async Task<MulticastSession> GetSession(string path)
         {
-            throw new NotImplementedException();
+            IFolder rootFolder = this.Settings.RootFolder;
+            ExistenceCheckResult pathExists = await rootFolder.CheckExistsAsync(path);
+            string key;
+            if (pathExists == ExistenceCheckResult.FileExists)
+            {
+                key = (await rootFolder.GetFileAsync(path)).Path;
+            }
+            else if (pathExists == ExistenceCheckResult.FolderExists)
+            {
+                key = (await rootFolder.GetFolderAsync(path)).Path;
+            }
+            else
+            {
+                throw new FileNotFoundException();
+            }
+
+            HashSet<int> usedSessions = new HashSet<int>();
+            foreach (MulticastSession session in this.Sessions)
+            {
+                if (session.Path == key)
+                {
+                    return session;
+                }
+
+                usedSessions.Add(session.SessionId);
+            }
+
+            if (usedSessions.Count >= this.ServerSettings.MaxSessions)
+            {
+                throw new InvalidOperationException(Resources.TooManySessions);
+            }
+
+            for (int i = 0; i < this.ServerSettings.MaxSessions; ++i)
+            {
+                if (!usedSessions.Contains(i))
+                {
+                    MulticastSession newSession = new MulticastSession(this, key, i);
+                    UdpWriter writer = await this.listener.CreateWriter(i, this.encoderFactory);
+                    await newSession.StartSession(writer, this.token);
+                    lock (this.sessionLock)
+                    {
+                        this.sessions.Add(newSession);
+                        return newSession;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException();
         }
     }
 }

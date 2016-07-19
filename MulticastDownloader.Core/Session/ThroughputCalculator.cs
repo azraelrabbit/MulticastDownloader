@@ -2,7 +2,7 @@
 // Copyright (c) 2016 MS.
 // </copyright>
 
-namespace MS.MulticastDownloader.Core.Server.Session
+namespace MS.MulticastDownloader.Core.Session
 {
     using System;
     using System.Diagnostics.Contracts;

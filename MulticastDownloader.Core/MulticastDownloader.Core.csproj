@@ -77,9 +77,14 @@
     <Compile Include="IO\SessionConnectionBase.cs" />
     <Compile Include="IO\TaskExtensionMethods.cs" />
     <Compile Include="IMulticastSettings.cs" />
+    <Compile Include="IReceptionReporting.cs" />
+    <Compile Include="ISequenceReporting.cs" />
+    <Compile Include="ITransferReporting.cs" />
     <Compile Include="SessionAbortedException.cs" />
+    <Compile Include="Session\BoxedDouble.cs" />
     <Compile Include="Session\ChallengeResponse.cs" />
     <Compile Include="Session\BoxedLong.cs" />
+    <Compile Include="Session\ThroughputCalculator.cs" />
     <Compile Include="Session\WaveCompleteResponse.cs" />
     <Compile Include="Session\WaveStatusUpdateRequest.cs" />
     <Compile Include="UriParameters.cs" />

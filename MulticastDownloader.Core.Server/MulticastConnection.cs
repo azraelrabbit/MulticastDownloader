@@ -14,7 +14,6 @@ namespace MS.MulticastDownloader.Core.Server
     using System.Threading.Tasks;
     using Common.Logging;
     using Core.Cryptography;
-    using Core.Session;
     using Cryptography;
     using IO;
     using Properties;
@@ -23,14 +22,15 @@ namespace MS.MulticastDownloader.Core.Server
     /// <summary>
     /// Represent an initial multicast connection.
     /// </summary>
+    /// <seealso cref="ITransferReporting" />
+    /// <seealso cref="ISequenceReporting"/>
+    /// <seealso cref="IReceptionReporting"/>
     /// <seealso cref="ServerBase" />
-    public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>
+    public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>, ITransferReporting, ISequenceReporting, IReceptionReporting
     {
-        private const int MaxIntervals = 10;
-
         private ILog log = LogManager.GetLogger<MulticastConnection>();
         private BoxedLong bytesPerSecond;
-        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MaxIntervals);
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MulticastClient.MaxIntervals);
         private BitVector written;
         private bool disposed;
 
@@ -106,6 +106,82 @@ namespace MS.MulticastDownloader.Core.Server
         }
 
         /// <summary>
+        /// Gets the total bytes in the payload.
+        /// </summary>
+        /// <value>
+        /// The total bytes in the payload.
+        /// </value>
+        public long TotalBytes
+        {
+            get
+            {
+                if (this.Session != null)
+                {
+                    return this.Session.TotalBytes;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the bytes remaining in the payload.
+        /// </summary>
+        /// <value>
+        /// The bytes remaining.
+        /// </value>
+        public long BytesRemaining
+        {
+            get
+            {
+                if (this.Session != null)
+                {
+                    return this.Session.BytesRemaining;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current sequence number in the download.
+        /// </summary>
+        /// <value>
+        /// The sequence number.
+        /// </value>
+        public long SequenceNumber
+        {
+            get
+            {
+                if (this.Session != null)
+                {
+                    return this.Session.SequenceNumber;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the wave number for the session.
+        /// </summary>
+        /// <value>
+        /// The wave number.
+        /// </value>
+        public long WaveNumber
+        {
+            get
+            {
+                if (this.Session != null)
+                {
+                    return this.Session.WaveNumber;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Gets the bytes per second.
         /// </summary>
         /// <value>
@@ -125,10 +201,29 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal ServerConnection ServerConnection
+        /// <summary>
+        /// Gets the packet reception rate for this connection.
+        /// </summary>
+        /// <value>
+        /// The reception rate, as a coefficient in the range [0,1].
+        /// </value>
+        public double ReceptionRate
         {
-            get;
-            private set;
+            get
+            {
+                if (this.Session != null)
+                {
+                    long receiveRate = this.BytesPerSecond;
+                    long transmitRate = this.Session.BytesPerSecond;
+                    if (transmitRate > 0)
+                    {
+                        double ret = (double)receiveRate / (double)transmitRate;
+                        Contract.Assert(ret >= 0 && ret <= 1.0);
+                    }
+                }
+
+                return 0.0;
+            }
         }
 
         internal MulticastServer Server
@@ -137,19 +232,25 @@ namespace MS.MulticastDownloader.Core.Server
             private set;
         }
 
-        internal DateTime WhenJoined
+        internal ServerConnection ServerConnection
         {
             get;
-            set;
-        }
-
-        internal DateTime WhenExpires
-        {
-            get;
-            set;
+            private set;
         }
 
         internal MulticastSession Session
+        {
+            get;
+            private set;
+        }
+
+        internal DateTime WhenJoined
+        {
+            get;
+            private set;
+        }
+
+        internal DateTime WhenExpires
         {
             get;
             private set;

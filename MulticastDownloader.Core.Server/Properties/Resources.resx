@@ -138,4 +138,7 @@
   <data name="ServerAborted" xml:space="preserve">
     <value>Server session aborted.</value>
   </data>
+  <data name="TooManySessions" xml:space="preserve">
+    <value>Too many sessions active.</value>
+  </data>
 </root>

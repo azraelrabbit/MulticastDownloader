@@ -10,7 +10,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using System.Linq;
     using System.Threading.Tasks;
     using Core.IO;
-    using Core.Session;
     using Session;
 
     // A asynchronous file chunk reader

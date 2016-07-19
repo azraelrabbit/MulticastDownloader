@@ -19,8 +19,12 @@ namespace MS.MulticastDownloader.Core
     /// <summary>
     /// Represent a multicast client.
     /// </summary>
-    public class MulticastClient : IDisposable
+    /// <see cref="ITransferReporting"/>
+    /// <see cref="ISequenceReporting"/>
+    /// <see cref="IReceptionReporting"/>
+    public class MulticastClient : IDisposable, ITransferReporting, ISequenceReporting, IReceptionReporting
     {
+        internal const int MaxIntervals = 10;
         internal const int PacketUpdateInterval = 1000;
         internal const int EncoderSize = 256;
         internal static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(30);
@@ -36,6 +40,10 @@ namespace MS.MulticastDownloader.Core
         private ChunkWriter writer;
         private UdpReader udpReader;
         private BoxedLong seqNum;
+        private BoxedLong waveNum;
+        private BoxedDouble receptionRate = new BoxedDouble(1.0);
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MaxIntervals);
+        private BoxedLong bytesPerSecond;
         private Task writeTask = null;
         private int state;
         private bool canReconnect;
@@ -170,6 +178,40 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
+        /// Gets the bytes per second.
+        /// </summary>
+        /// <value>
+        /// The bytes per second.
+        /// </value>
+        public long BytesPerSecond
+        {
+            get
+            {
+                BoxedLong bytesPerSecond = this.bytesPerSecond;
+                if (bytesPerSecond != null)
+                {
+                    return bytesPerSecond.Value;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the written bits.
+        /// </summary>
+        /// <value>
+        /// The written bits.
+        /// </value>
+        public BitVector Written
+        {
+            get
+            {
+                return this.written;
+            }
+        }
+
+        /// <summary>
         /// Gets the current sequence number in the download.
         /// </summary>
         /// <value>
@@ -197,8 +239,36 @@ namespace MS.MulticastDownloader.Core
         /// </value>
         public long WaveNumber
         {
-            get;
-            private set;
+            get
+            {
+                BoxedLong wave = this.waveNum;
+                if (wave != null)
+                {
+                    return wave.Value;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the packet reception rate reported from the last wave update.
+        /// </summary>
+        /// <value>
+        /// The reception rate, as a coefficient in the range [0,1].
+        /// </value>
+        public double ReceptionRate
+        {
+            get
+            {
+                BoxedDouble receptionRate = this.receptionRate;
+                if (receptionRate != null)
+                {
+                    return receptionRate.Value;
+                }
+
+                return 0;
+            }
         }
 
         /// <summary>
@@ -384,8 +454,8 @@ namespace MS.MulticastDownloader.Core
                 this.log.Debug("Bytes remaining: " + this.BytesRemaining);
 
                 this.log.DebugFormat("Listening on {0}:{1}", response.MulticastAddress, response.MulticastPort);
-                this.WaveNumber = response.WaveNumber;
-                this.log.Debug("Starting wave: " + this.WaveNumber);
+                this.waveNum = new BoxedLong(response.WaveNumber);
+                this.log.Debug("Starting wave: " + response.WaveNumber);
                 this.udpReader = await this.cliConn.JoinMulticastServer(response, this.fileEncoder);
             }
             catch (Exception ex)
@@ -398,6 +468,7 @@ namespace MS.MulticastDownloader.Core
         {
             try
             {
+                this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
                 while (!this.complete)
@@ -443,7 +514,9 @@ namespace MS.MulticastDownloader.Core
                     while (this.complete = !this.written.Contains(false))
                     {
                         PacketStatusUpdate statusUpdate = new PacketStatusUpdate();
-                        long bytesLeft = this.written.Count((v) => !v);
+                        long bytesLeft = this.BytesRemaining;
+                        long average = this.throughputCalculator.UpdateThroughput(bytesLeft, DateTime.Now);
+                        this.bytesPerSecond = new BoxedLong(average);
                         statusUpdate.BytesLeft = bytesLeft;
                         statusUpdate.LeavingSession = this.complete;
                         this.log.Debug("Sequence: " + this.SequenceNumber + "  Bytes left: " + bytesLeft + "  Leaving session: " + this.complete);
@@ -463,8 +536,9 @@ namespace MS.MulticastDownloader.Core
                             waveUpdate.FileBitVector = this.written.RawBits;
                             await this.cliConn.Send(waveUpdate, this.token);
                             WaveCompleteResponse waveResp = await this.CheckResponse<WaveCompleteResponse>();
-                            this.WaveNumber = waveResp.WaveNumber;
-                            this.log.Debug("New wave: " + this.WaveNumber);
+                            this.waveNum = new BoxedLong(waveResp.WaveNumber);
+                            this.receptionRate = new BoxedDouble(waveResp.ReceptionRate);
+                            this.log.Debug("New wave: " + waveResp.WaveNumber);
                         }
 
                         await Task.Delay(PacketUpdateInterval, this.token);

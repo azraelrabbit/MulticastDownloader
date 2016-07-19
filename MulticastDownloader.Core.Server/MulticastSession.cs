@@ -19,16 +19,15 @@ namespace MS.MulticastDownloader.Core.Server
     using IO;
     using PCLStorage;
     using Properties;
-    using Session;
 
     /// <summary>
     /// Represent a multicast session.
     /// </summary>
     /// <seealso cref="ServerBase" />
-    public class MulticastSession : ServerBase, IEquatable<MulticastSession>
+    /// <seealso cref="ITransferReporting" />
+    /// <seealso cref="ISequenceReporting"/>
+    public class MulticastSession : ServerBase, IEquatable<MulticastSession>, ITransferReporting, ISequenceReporting
     {
-        private const int MaxIntervals = 10;
-
         private ILog log = LogManager.GetLogger<MulticastSession>();
         private BitVector written;
         private ChunkReader reader;
@@ -36,7 +35,7 @@ namespace MS.MulticastDownloader.Core.Server
         private UdpWriter writer;
         private BoxedLong seqNum;
         private BoxedLong waveNum;
-        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MaxIntervals);
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MulticastClient.MaxIntervals);
         private BoxedLong bytesPerSecond;
         private bool disposed;
 
@@ -225,14 +224,28 @@ namespace MS.MulticastDownloader.Core.Server
 
         internal string MulticastAddress
         {
-            get;
-            private set;
+            get
+            {
+                if (this.writer != null)
+                {
+                    return this.writer.MulticastAddress;
+                }
+
+                return string.Empty;
+            }
         }
 
         internal int MulticastPort
         {
-            get;
-            private set;
+            get
+            {
+                if (this.writer != null)
+                {
+                    return this.writer.MulticastPort;
+                }
+
+                return 0;
+            }
         }
 
         internal ICollection<FileHeader> FileHeaders

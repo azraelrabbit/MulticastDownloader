@@ -73,7 +73,6 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="ServerBase.cs" />
-    <Compile Include="Session\ThroughputCalculator.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj">

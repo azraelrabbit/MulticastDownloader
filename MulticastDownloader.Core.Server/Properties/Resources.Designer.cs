@@ -123,5 +123,14 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
                 return ResourceManager.GetString("ServerAborted", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Too many sessions active..
+        /// </summary>
+        internal static string TooManySessions {
+            get {
+                return ResourceManager.GetString("TooManySessions", resourceCulture);
+            }
+        }
     }
 }

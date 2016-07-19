@@ -25,7 +25,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
     {
         private ILog log = LogManager.GetLogger<ServerListener>();
         private IEncoderFactory encoder;
-        private int port;
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
         private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool udpListen;
@@ -42,6 +41,24 @@ namespace MS.MulticastDownloader.Core.Server.IO
             private set;
         }
 
+        internal string MulticastAddress
+        {
+            get;
+            private set;
+        }
+
+        internal int MulticastPort
+        {
+            get;
+            private set;
+        }
+
+        internal bool Ipv6
+        {
+            get;
+            private set;
+        }
+
         internal UdpSocketMulticastClient MulticastClient
         {
             get
@@ -53,8 +70,10 @@ namespace MS.MulticastDownloader.Core.Server.IO
         internal async Task StartMulticastServer(int sessionId, IEncoderFactory encoderFactory)
         {
             Contract.Requires(sessionId >= 0 && sessionId < this.ServerSettings.MaxSessions);
-            this.port = this.ServerSettings.MulticastStartPort + sessionId;
-            this.BlockSize = SessionJoinResponse.GetBlockSize(this.ServerSettings.Mtu, this.ServerSettings.Ipv6);
+            this.MulticastAddress = this.ServerSettings.MulticastAddress;
+            this.MulticastPort = this.ServerSettings.MulticastStartPort + sessionId;
+            this.Ipv6 = this.ServerSettings.Ipv6;
+            this.BlockSize = SessionJoinResponse.GetBlockSize(this.ServerSettings.Mtu, this.Ipv6);
             if (encoderFactory != null)
             {
                 this.encoder = encoderFactory;
@@ -71,17 +90,17 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
             this.udpListen = true;
             ICommsInterface commsInterface = await this.GetCommsInterface();
-            this.log.DebugFormat("Initializing multicast session on {0}:{1}, if={2}", this.ServerSettings.MulticastAddress, this.ServerSettings.MulticastStartPort + sessionId, commsInterface != null ? commsInterface.Name : string.Empty);
+            this.log.DebugFormat("Initializing multicast session on {0}:{1}, if={2}", this.MulticastAddress, this.MulticastPort, commsInterface != null ? commsInterface.Name : string.Empty);
             if (commsInterface != null)
             {
                 this.log.DebugFormat("Interface broadcast ip={0}", commsInterface.BroadcastAddress);
-                if (this.ServerSettings.MulticastAddress != commsInterface.BroadcastAddress)
+                if (this.MulticastAddress != commsInterface.BroadcastAddress)
                 {
                     this.log.Warn("WARNING: Check your server settings. The broadcast address of your interface doesn't match the multicast address. This could result in weird behavior.");
                 }
             }
 
-            await this.multicastClient.JoinMulticastGroupAsync(this.ServerSettings.MulticastAddress, this.port, commsInterface);
+            await this.multicastClient.JoinMulticastGroupAsync(this.MulticastAddress, this.MulticastPort, commsInterface);
         }
 
         internal override async Task Close()
