@@ -56,6 +56,7 @@
     <Compile Include="Cryptography\ITcpSocketClientExtensions.cs" />
     <Compile Include="DelayCalculation.cs" />
     <Compile Include="IMulticastServerSettings.cs" />
+    <Compile Include="IMulticastServerSettingsExtensionMethods.cs" />
     <Compile Include="IO\ChunkReader.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
     <Compile Include="IO\ServerConnection.cs" />

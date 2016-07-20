@@ -35,10 +35,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
         internal ServerListener(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
             : base(parms, settings, serverSettings)
         {
-            if (parms.UseTls && settings.Encoder == null)
-            {
-                throw new ArgumentException(Resources.MustSpecifyKeyFile, "serverSettings");
-            }
         }
 
         internal TcpSocketListener Listener
@@ -125,7 +121,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
         private void SocketConnectionRecieved(object sender, TcpSocketListenerConnectEventArgs eventArgs)
         {
-            while (this.connections.Count >= this.ServerSettings.MaxConnectionsPerSession)
+            while (this.connections.Count >= this.ServerSettings.MaxConnections)
             {
                 ServerConnection conn;
                 if (this.connections.TryDequeue(out conn))

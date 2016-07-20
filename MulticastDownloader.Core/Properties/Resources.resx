@@ -147,8 +147,17 @@
   <data name="InvalidKeyFile" xml:space="preserve">
     <value>Invalid key file.</value>
   </data>
+  <data name="InvalidMulticastBufferSize" xml:space="preserve">
+    <value>Invalid multicast buffer size.</value>
+  </data>
+  <data name="InvalidRootFolder" xml:space="preserve">
+    <value>Invalid root folder.</value>
+  </data>
   <data name="InvalidServerCertificate" xml:space="preserve">
     <value>Server certificate was invalid.</value>
+  </data>
+  <data name="InvalidTtl" xml:space="preserve">
+    <value>Invalid TTL.</value>
   </data>
   <data name="InvalidUriScheme" xml:space="preserve">
     <value>Invalid URI scheme.</value>
@@ -173,8 +182,5 @@
   </data>
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>
-  </data>
-  <data name="TcpDownloadFailed" xml:space="preserve">
-    <value>TCP download failed.</value>
   </data>
 </root>

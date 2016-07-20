@@ -75,13 +75,14 @@ namespace MS.MulticastDownloader.Core
                 throw new ArgumentNullException("settings");
             }
 
+            settings.Validate();
             this.Parameters = new UriParameters(path);
+            this.Settings = settings;
             if (this.Parameters.UseTls && this.Settings.Encoder == null)
             {
                 throw new ArgumentException(Resources.MustSpecifyEncoder, "settings");
             }
 
-            this.Settings = settings;
             this.token = CancellationToken.None;
             this.state = state;
         }
@@ -521,7 +522,8 @@ namespace MS.MulticastDownloader.Core
                         statusUpdate.LeavingSession = this.complete;
                         this.log.Debug("Sequence: " + this.SequenceNumber + "  Bytes left: " + bytesLeft + "  Leaving session: " + this.complete);
                         await this.cliConn.Send(statusUpdate, this.token);
-                        Response resp = await this.CheckResponse<Response>();
+                        PacketStatusUpdateResponse resp = await this.CheckResponse<PacketStatusUpdateResponse>();
+                        this.receptionRate = new BoxedDouble(resp.ReceptionRate);
                         if (resp.ResponseType == Session.ResponseId.WaveComplete)
                         {
                             this.log.Debug("Wave complete");
@@ -537,7 +539,6 @@ namespace MS.MulticastDownloader.Core
                             await this.cliConn.Send(waveUpdate, this.token);
                             WaveCompleteResponse waveResp = await this.CheckResponse<WaveCompleteResponse>();
                             this.waveNum = new BoxedLong(waveResp.WaveNumber);
-                            this.receptionRate = new BoxedDouble(waveResp.ReceptionRate);
                             this.log.Debug("New wave: " + waveResp.WaveNumber);
                         }
 

@@ -152,11 +152,38 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid multicast buffer size..
+        /// </summary>
+        internal static string InvalidMulticastBufferSize {
+            get {
+                return ResourceManager.GetString("InvalidMulticastBufferSize", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid root folder..
+        /// </summary>
+        internal static string InvalidRootFolder {
+            get {
+                return ResourceManager.GetString("InvalidRootFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Server certificate was invalid..
         /// </summary>
         internal static string InvalidServerCertificate {
             get {
                 return ResourceManager.GetString("InvalidServerCertificate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid TTL..
+        /// </summary>
+        internal static string InvalidTtl {
+            get {
+                return ResourceManager.GetString("InvalidTtl", resourceCulture);
             }
         }
         
@@ -229,15 +256,6 @@ namespace MS.MulticastDownloader.Core.Properties {
         internal static string StringCannotBeNullOrEmpty {
             get {
                 return ResourceManager.GetString("StringCannotBeNullOrEmpty", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to TCP download failed..
-        /// </summary>
-        internal static string TcpDownloadFailed {
-            get {
-                return ResourceManager.GetString("TcpDownloadFailed", resourceCulture);
             }
         }
     }

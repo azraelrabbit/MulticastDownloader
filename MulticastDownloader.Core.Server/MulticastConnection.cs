@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Core.Server
     using System;
     using System.Collections.Generic;
     using System.Diagnostics.Contracts;
+    using System.Globalization;
     using System.IO;
     using System.Linq;
     using System.Text;
@@ -322,11 +323,16 @@ namespace MS.MulticastDownloader.Core.Server
         /// </returns>
         public override string ToString()
         {
-            return "[" + (this.Session != null ? this.Session.SessionId.ToString() : string.Empty) + "]" + (this.RemoteAddress ?? string.Empty) + ":" + this.RemotePort;
+            return "[" + (this.Session != null ? this.Session.SessionId.ToString(CultureInfo.InvariantCulture) : string.Empty) + "]" + (this.RemoteAddress ?? string.Empty) + ":" + this.RemotePort;
         }
 
         internal async Task<string> AcceptConnection(CancellationToken token)
         {
+            if (this.Server.Connections.Count >= this.Server.ServerSettings.MaxConnections)
+            {
+                throw new InvalidOperationException(Resources.TooManyConnections);
+            }
+
             Challenge challenge = new Challenge();
             if (this.Server.Settings.Encoder != null)
             {

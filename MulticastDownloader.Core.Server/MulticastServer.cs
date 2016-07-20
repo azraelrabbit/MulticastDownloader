@@ -68,14 +68,22 @@ namespace MS.MulticastDownloader.Core.Server
                 throw new ArgumentNullException("settings");
             }
 
+            settings.Validate();
+
             if (serverSettings == null)
             {
                 throw new ArgumentNullException("serverSettings");
             }
 
+            serverSettings.Validate();
             this.Parameters = new UriParameters(path);
             this.Settings = settings;
             this.ServerSettings = serverSettings;
+            if (this.Parameters.UseTls && this.Settings.Encoder == null)
+            {
+                throw new ArgumentException(Resources.MustSpecifyEncoder, "settings");
+            }
+
             this.listener = new ServerListener(this.Parameters, settings, serverSettings);
             SecureRandom sr = new SecureRandom();
             this.ChallengeKey = new byte[MulticastClient.EncoderSize / 8];
@@ -378,40 +386,21 @@ namespace MS.MulticastDownloader.Core.Server
                         CancellationToken timeoutToken = timeoutCts.Token;
                         MulticastConnection mcConn = new MulticastConnection(this, conn);
                         string path;
-                        timeoutCts.CancelAfter(ResponseDelay);
                         try
                         {
+                            timeoutCts.CancelAfter(ResponseDelay);
                             path = await mcConn.AcceptConnection(timeoutToken);
+
+                            MulticastSession session = await this.GetSession(path);
+
+                            timeoutCts.CancelAfter(ResponseDelay);
+                            await mcConn.JoinSession(session, timeoutToken);
                         }
                         catch (Exception ex)
                         {
                             this.log.Warn("Client connection failed");
                             this.log.Warn(ex.Message);
-                            continue;
-                        }
-
-                        MulticastSession session;
-                        try
-                        {
-                            session = await this.GetSession(path);
-                        }
-                        catch (Exception ex)
-                        {
-                            this.log.Warn("Retrieving multicast session failed: " + ex.Message);
-                            this.log.Warn(ex.Message);
                             await mcConn.SessionJoinFailed(timeoutToken, ex);
-                            continue;
-                        }
-
-                        timeoutCts.CancelAfter(ResponseDelay);
-                        try
-                        {
-                            await mcConn.JoinSession(session, timeoutToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            this.log.Warn("Session join failed");
-                            this.log.Warn(ex.Message);
                             continue;
                         }
 
@@ -499,7 +488,6 @@ namespace MS.MulticastDownloader.Core.Server
                 WaveCompleteResponse response = new WaveCompleteResponse();
                 response.ResponseType = ResponseId.Ok;
                 response.WaveNumber = mc.Session.WaveNumber;
-                response.ReceptionRate = mc.ReceptionRate;
                 return response;
             });
         }
@@ -535,12 +523,13 @@ namespace MS.MulticastDownloader.Core.Server
                         finalUpdate = true;
                     }
 
-                    await this.RespondToClients<PacketStatusUpdate, Response>((psu, mc, token) =>
+                    await this.RespondToClients<PacketStatusUpdate, PacketStatusUpdateResponse>((psu, mc, token) =>
                     {
                         DateTime when = DateTime.Now;
                         mc.UpdatePacketStatus(psu, when, token);
-                        Response response = new Response();
+                        PacketStatusUpdateResponse response = new PacketStatusUpdateResponse();
                         response.ResponseType = finalUpdate ? ResponseId.WaveComplete : ResponseId.Ok;
+                        response.ReceptionRate = mc.ReceptionRate;
                         return response;
                     });
 

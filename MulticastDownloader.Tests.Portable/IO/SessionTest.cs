@@ -95,7 +95,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 }
 
                 List<ClientConnection> clientConns = new List<ClientConnection>();
-                for (int i = 0; i < serverSettings.MaxConnectionsPerSession; ++i)
+                for (int i = 0; i < serverSettings.MaxConnections; ++i)
                 {
                     ClientConnection cliConn = new ClientConnection(uriParams, settings);
                     Assert.Equal(uriParams, cliConn.UriParameters);
@@ -107,7 +107,7 @@ namespace MS.MulticastDownloader.Tests.IO
 
                 List<ServerConnection> serverConns = new List<ServerConnection>();
                 DateTime end = DateTime.Now.AddMinutes(10);
-                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnectionsPerSession)
+                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
                 {
                     await Task.Delay(200);
                     foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
@@ -162,7 +162,7 @@ namespace MS.MulticastDownloader.Tests.IO
 
                 await Task.WhenAll(writeTasks);
                 await CloseConnections(clientConns, serverConns);
-                for (int i = 0; i < serverSettings.MaxConnectionsPerSession + 1; ++i)
+                for (int i = 0; i < serverSettings.MaxConnections + 1; ++i)
                 {
                     ClientConnection cliConn = new ClientConnection(uriParams, settings);
                     await cliConn.Connect();
@@ -170,7 +170,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 }
 
                 end = DateTime.Now.AddMinutes(10);
-                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnectionsPerSession)
+                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
                 {
                     await Task.Delay(200);
                     foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
@@ -179,7 +179,7 @@ namespace MS.MulticastDownloader.Tests.IO
                     }
                 }
 
-                Assert.Equal(serverSettings.MaxConnectionsPerSession, serverConns.Count);
+                Assert.Equal(serverSettings.MaxConnections, serverConns.Count);
                 await CloseConnections(clientConns, serverConns);
                 await listener.Close();
             }
@@ -332,7 +332,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 this.Mtu = 1500;
 
                 // FIXMEFIXME
-                this.MaxConnectionsPerSession = 10;
+                this.MaxConnections = 10;
                 this.MaxSessions = 10;
                 this.MulticastStartPort = 0xFF00;
                 this.MaxBytesPerSecond = long.MaxValue;
@@ -345,6 +345,12 @@ namespace MS.MulticastDownloader.Tests.IO
                 {
                     this.MulticastAddress = "239.0.0.1";
                 }
+            }
+
+            public DelayCalculation DelayCalculation
+            {
+                get;
+                set;
             }
 
             public string InterfaceName
@@ -365,7 +371,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 set;
             }
 
-            public int MaxConnectionsPerSession
+            public int MaxConnections
             {
                 get;
                 set;

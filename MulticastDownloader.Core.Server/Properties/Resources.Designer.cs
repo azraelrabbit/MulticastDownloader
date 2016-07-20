@@ -98,6 +98,15 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid multicast burst length..
+        /// </summary>
+        internal static string InvalidMulticastBurstLength {
+            get {
+                return ResourceManager.GetString("InvalidMulticastBurstLength", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to IPV6 multicast addresses are not currently supported..
         /// </summary>
         internal static string Ipv6MulticastNotSupported {
@@ -107,11 +116,56 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Must specify a key file when using TLS..
+        ///   Looks up a localized string similar to Maximum connections too low..
         /// </summary>
-        internal static string MustSpecifyKeyFile {
+        internal static string MaxConnectionsTooLow {
             get {
-                return ResourceManager.GetString("MustSpecifyKeyFile", resourceCulture);
+                return ResourceManager.GetString("MaxConnectionsTooLow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Maximum sessions too low..
+        /// </summary>
+        internal static string MaxSessionsTooLow {
+            get {
+                return ResourceManager.GetString("MaxSessionsTooLow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to MTU must be at least 576..
+        /// </summary>
+        internal static string MtuTooLow {
+            get {
+                return ResourceManager.GetString("MtuTooLow", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify at least 10 megabits per second as the upper limit..
+        /// </summary>
+        internal static string MustSpecifyAtLeast10MbitASecond {
+            get {
+                return ResourceManager.GetString("MustSpecifyAtLeast10MbitASecond", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify an encoder when using TLS..
+        /// </summary>
+        internal static string MustSpecifyEncoder {
+            get {
+                return ResourceManager.GetString("MustSpecifyEncoder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Must specify a multicast address and start port..
+        /// </summary>
+        internal static string MustSpecifyMulticastAddressAndStartPort {
+            get {
+                return ResourceManager.GetString("MustSpecifyMulticastAddressAndStartPort", resourceCulture);
             }
         }
         
@@ -121,6 +175,15 @@ namespace MS.MulticastDownloader.Core.Server.Properties {
         internal static string ServerAborted {
             get {
                 return ResourceManager.GetString("ServerAborted", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Too many connections active..
+        /// </summary>
+        internal static string TooManyConnections {
+            get {
+                return ResourceManager.GetString("TooManyConnections", resourceCulture);
             }
         }
         

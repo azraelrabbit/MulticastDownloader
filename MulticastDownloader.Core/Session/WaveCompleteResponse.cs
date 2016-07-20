@@ -12,8 +12,5 @@ namespace MS.MulticastDownloader.Core.Session
         // The next wave number.
         [ProtoMember(1)]
         internal long WaveNumber { get; set; }
-
-        [ProtoMember(2)]
-        internal double ReceptionRate { get; set; }
     }
 }

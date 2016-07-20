@@ -68,6 +68,7 @@
     <Compile Include="Cryptography\PassphraseEncoder.cs" />
     <Compile Include="Cryptography\AsymmetricEncoder.cs" />
     <Compile Include="Cryptography\PassphraseEncoderFactory.cs" />
+    <Compile Include="IMulticastSettingsExtensionMethods.cs" />
     <Compile Include="IO\ChunkBase.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
@@ -84,6 +85,7 @@
     <Compile Include="Session\BoxedDouble.cs" />
     <Compile Include="Session\ChallengeResponse.cs" />
     <Compile Include="Session\BoxedLong.cs" />
+    <Compile Include="Session\PacketStatusUpdateResponse.cs" />
     <Compile Include="Session\ThroughputCalculator.cs" />
     <Compile Include="Session\WaveCompleteResponse.cs" />
     <Compile Include="Session\WaveStatusUpdateRequest.cs" />

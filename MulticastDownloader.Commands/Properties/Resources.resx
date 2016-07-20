@@ -117,49 +117,22 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="AttemptToAddDuplicateConnection" xml:space="preserve">
-    <value>Attempt to add a duplicate connection to the server.</value>
+  <data name="CtrlCPressed" xml:space="preserve">
+    <value>CTRL-C pressed...</value>
   </data>
-  <data name="AuthenticationFailed" xml:space="preserve">
-    <value>Authentication failed.</value>
+  <data name="DownloadActivity" xml:space="preserve">
+    <value>download</value>
   </data>
-  <data name="CertificateTypeMismatch" xml:space="preserve">
-    <value>Certificate type mismatch: expected a private key file.</value>
+  <data name="DownloadStatus" xml:space="preserve">
+    <value>download status.</value>
   </data>
-  <data name="CouldNotFindInterface" xml:space="preserve">
-    <value>Could not find the specified interface on this server.</value>
+  <data name="ReceptionActivity" xml:space="preserve">
+    <value>reception</value>
   </data>
-  <data name="InvalidMulticastBurstLength" xml:space="preserve">
-    <value>Invalid multicast burst length.</value>
+  <data name="ReceptionStatus" xml:space="preserve">
+    <value>reception status.</value>
   </data>
-  <data name="Ipv6MulticastNotSupported" xml:space="preserve">
-    <value>IPV6 multicast addresses are not currently supported.</value>
-  </data>
-  <data name="MaxConnectionsTooLow" xml:space="preserve">
-    <value>Maximum connections too low.</value>
-  </data>
-  <data name="MaxSessionsTooLow" xml:space="preserve">
-    <value>Maximum sessions too low.</value>
-  </data>
-  <data name="MtuTooLow" xml:space="preserve">
-    <value>MTU must be at least 576.</value>
-  </data>
-  <data name="MustSpecifyAtLeast10MbitASecond" xml:space="preserve">
-    <value>Must specify at least 10 megabits per second as the upper limit.</value>
-  </data>
-  <data name="MustSpecifyEncoder" xml:space="preserve">
-    <value>Must specify an encoder when using TLS.</value>
-  </data>
-  <data name="MustSpecifyMulticastAddressAndStartPort" xml:space="preserve">
-    <value>Must specify a multicast address and start port.</value>
-  </data>
-  <data name="ServerAborted" xml:space="preserve">
-    <value>Server session aborted.</value>
-  </data>
-  <data name="TooManyConnections" xml:space="preserve">
-    <value>Too many connections active.</value>
-  </data>
-  <data name="TooManySessions" xml:space="preserve">
-    <value>Too many sessions active.</value>
+  <data name="SourcePathNotFound" xml:space="preserve">
+    <value>Source path not found.</value>
   </data>
 </root>
