@@ -226,6 +226,18 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
+        /// <summary>
+        /// Gets the multicast session.
+        /// </summary>
+        /// <value>
+        /// The multicast session this connection belongs to.
+        /// </value>
+        public MulticastSession Session
+        {
+            get;
+            private set;
+        }
+
         internal MulticastServer Server
         {
             get;
@@ -233,12 +245,6 @@ namespace MS.MulticastDownloader.Core.Server
         }
 
         internal ServerConnection ServerConnection
-        {
-            get;
-            private set;
-        }
-
-        internal MulticastSession Session
         {
             get;
             private set;

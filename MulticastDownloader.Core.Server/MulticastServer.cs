@@ -15,12 +15,12 @@ namespace MS.MulticastDownloader.Core.Server
     using System.Threading.Tasks;
     using Common.Logging;
     using Core.Cryptography;
-    using Core.Session;
     using Cryptography;
     using IO;
     using Org.BouncyCastle.Security;
     using PCLStorage;
     using Properties;
+    using Session;
 
     /// <summary>
     /// Represent a multicast server.
@@ -28,18 +28,28 @@ namespace MS.MulticastDownloader.Core.Server
     /// <seealso cref="ServerBase" />
     /// <seealso cref="MulticastConnection" />
     /// <seealso cref="MulticastSession" />
-    public class MulticastServer : ServerBase
+    /// <seealso cref="IReceptionReporting" />
+    public class MulticastServer : ServerBase, ITransferReporting, IReceptionReporting
     {
         // Clients much respond to any request with the given interval
         internal static readonly TimeSpan ResponseDelay = TimeSpan.FromSeconds(60);
+
+        private const int MinBurstDelay = 1;
+        private const int StartBurstDelay = 10;
+        private const int MaxBurstDelay = 999;
+        private const double DecreaseThreshold = 0.98;
+        private const double IncreaseThreshold = 0.90;
+
         private ILog log = LogManager.GetLogger<MulticastServer>();
         private object connectionLock = new object();
         private object sessionLock = new object();
         private List<MulticastConnection> connections = new List<MulticastConnection>();
         private List<MulticastSession> sessions = new List<MulticastSession>();
+        private MulticastSession activeSession;
         private AutoResetEvent joinEvent = new AutoResetEvent(false);
         private ServerListener listener;
         private HashEncoderFactory encoderFactory;
+        private BoxedDouble receptionRate = new BoxedDouble(1.0);
         private CancellationToken token = CancellationToken.None;
         private bool listening;
         private bool disposed;
@@ -143,6 +153,92 @@ namespace MS.MulticastDownloader.Core.Server
             private set;
         }
 
+        /// <summary>
+        /// Gets the packet reception rate.
+        /// </summary>
+        /// <value>
+        /// The reception rate, as a coefficient in the range [0,1].
+        /// </value>
+        public double ReceptionRate
+        {
+            get
+            {
+                BoxedDouble receptionRate = this.receptionRate;
+                if (receptionRate != null)
+                {
+                    return receptionRate.Value;
+                }
+
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets the total bytes in the payload.
+        /// </summary>
+        /// <value>
+        /// The total bytes in the payload.
+        /// </value>
+        public long TotalBytes
+        {
+            get
+            {
+                lock (this.sessionLock)
+                {
+                    long ret = 0;
+                    foreach (MulticastSession session in this.sessions)
+                    {
+                        ret += session.TotalBytes;
+                    }
+
+                    return ret;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the bytes remaining in the payload.
+        /// </summary>
+        /// <value>
+        /// The bytes remaining.
+        /// </value>
+        public long BytesRemaining
+        {
+            get
+            {
+                lock (this.sessionLock)
+                {
+                    long ret = 0;
+                    foreach (MulticastSession session in this.sessions)
+                    {
+                        ret += session.BytesRemaining;
+                    }
+
+                    return ret;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the bytes per second.
+        /// </summary>
+        /// <value>
+        /// The bytes per second.
+        /// </value>
+        public long BytesPerSecond
+        {
+            get
+            {
+                MulticastSession session = this.activeSession;
+                if (session != null)
+                {
+                    return session.BytesPerSecond;
+                }
+
+                return 0;
+            }
+        }
+
         internal byte[] ChallengeKey
         {
             get;
@@ -201,10 +297,10 @@ namespace MS.MulticastDownloader.Core.Server
                                 }
 
                                 // Calculate the multicast payload for the open sessions and transmit a multicast wave.
-                                IDictionary<int, ICollection<MulticastConnection>> connectionsBySessionId = await this.CleanupConnections();
-                                ICollection<MulticastSession> waveSessions = this.CalculatePayloadAndCleanupSessions(connectionsBySessionId);
+                                ICollection<MulticastConnection> waveConnections = await this.CleanupConnections();
+                                ICollection<MulticastSession> waveSessions = this.CalculatePayloadAndCleanupSessions(waveConnections);
                                 this.token.ThrowIfCancellationRequested();
-                                await this.TransmitUdp(waveSessions);
+                                await this.TransmitUdp(waveSessions, waveConnections);
                                 await this.WaveUpdate();
                             }
                         }
@@ -334,10 +430,9 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        private async Task<IDictionary<int, ICollection<MulticastConnection>>> CleanupConnections()
+        private async Task<ICollection<MulticastConnection>> CleanupConnections()
         {
             ICollection<MulticastConnection> connections = this.Connections;
-            Dictionary<int, ICollection<MulticastConnection>> connectionsBySessionId = new Dictionary<int, ICollection<MulticastConnection>>(this.Sessions.Count);
             List<MulticastConnection> newConns = new List<MulticastConnection>(connections.Count);
             DateTime now = DateTime.Now;
             foreach (MulticastConnection conn in connections)
@@ -350,53 +445,84 @@ namespace MS.MulticastDownloader.Core.Server
                 else
                 {
                     newConns.Add(conn);
-                    ICollection<MulticastConnection> connectionBag = connectionsBySessionId[conn.Session.SessionId];
-                    if (connectionBag == null)
-                    {
-                        connectionBag = connectionsBySessionId[conn.Session.SessionId] = new List<MulticastConnection>(this.connections.Count);
-                    }
-
-                    connectionBag.Add(conn);
                 }
             }
 
             this.connections = newConns;
-            return connectionsBySessionId;
+            return newConns;
         }
 
-        private ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(IDictionary<int, ICollection<MulticastConnection>> connectionsBySessionId)
+        private ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection> connections)
         {
-            ICollection<MulticastSession> sessions = this.Sessions;
-            sessions.AsParallel().ForAll(async (ms) =>
+            HashSet<MulticastSession> activeSessions = new HashSet<MulticastSession>();
+            foreach (MulticastConnection conn in connections)
             {
-                ICollection<MulticastConnection> connections = connectionsBySessionId[ms.SessionId];
-                ms.CalculatePayload(connections);
-                if (ms.BytesRemaining == 0)
-                {
-                    lock (this.sessionLock)
-                    {
-                        this.sessions.Remove(ms);
-                    }
-
-                    await ms.Close();
-                    ms.Dispose();
-                }
-            });
-
-            long waveRemaining = 0;
-            long waveTotal = 0;
-            foreach (MulticastSession session in sessions)
-            {
-                waveRemaining += session.BytesRemaining;
-                waveTotal += session.TotalBytes;
+                activeSessions.Add(conn.Session);
             }
 
-            this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes remaining: {0}", waveRemaining);
-            this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes total: {0}", waveTotal);
-            return sessions;
+            lock (this.sessionLock)
+            {
+                this.sessions.AsParallel().ForAll(async (ms) =>
+                {
+                    if (!activeSessions.Contains(ms))
+                    {
+                        await ms.Close();
+                        ms.Dispose();
+                    }
+
+                    ms.CalculatePayload(connections);
+                });
+
+                this.sessions = activeSessions.ToList();
+
+                long waveRemaining = 0;
+                long waveTotal = 0;
+                foreach (MulticastSession session in this.sessions)
+                {
+                    waveRemaining += session.BytesRemaining;
+                    waveTotal += session.TotalBytes;
+                }
+
+                this.activeSession = null;
+                this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes remaining: {0}", waveRemaining);
+                this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes total: {0}", waveTotal);
+                return this.sessions;
+            }
         }
 
-        private async Task ProcessStatusUpdates(CancellationToken updateToken)
+        private async Task WaveUpdate()
+        {
+            await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>((wsu, mc, token) =>
+            {
+                DateTime when = DateTime.Now;
+                mc.UpdateWaveStatus(wsu, when, token);
+                WaveCompleteResponse response = new WaveCompleteResponse();
+                response.ResponseType = ResponseId.Ok;
+                response.WaveNumber = mc.Session.WaveNumber;
+                response.ReceptionRate = mc.ReceptionRate;
+                return response;
+            });
+        }
+
+        private async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
+        {
+            using (CancellationTokenSource statusCts = new CancellationTokenSource())
+            using (CancellationTokenRegistration statusCancellationTokenCanceller = statusCts.Token.Register(() => statusCts.Cancel()))
+            {
+                Task statusUpdate = this.ProcessStatusUpdates(connections, statusCts.Token);
+                foreach (MulticastSession session in sessions)
+                {
+                    this.token.ThrowIfCancellationRequested();
+                    this.activeSession = session;
+                    await session.TransmitWave(this.token);
+                }
+
+                statusCts.Cancel();
+                await statusUpdate;
+            }
+        }
+
+        private async Task ProcessStatusUpdates(ICollection<MulticastConnection> connections, CancellationToken updateToken)
         {
             bool waveComplete = false;
             using (CancellationTokenRegistration registration = updateToken.Register(() => waveComplete = true))
@@ -417,22 +543,10 @@ namespace MS.MulticastDownloader.Core.Server
                         response.ResponseType = finalUpdate ? ResponseId.WaveComplete : ResponseId.Ok;
                         return response;
                     });
+
+                    this.UpdateBurstDelay(connections);
                 }
             }
-        }
-
-        private async Task WaveUpdate()
-        {
-            await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>((wsu, mc, token) =>
-            {
-                DateTime when = DateTime.Now;
-                mc.UpdateWaveStatus(wsu, when, token);
-                WaveCompleteResponse response = new WaveCompleteResponse();
-                response.ResponseType = ResponseId.Ok;
-                response.WaveNumber = mc.Session.WaveNumber;
-                response.ReceptionRate = mc.ReceptionRate;
-                return response;
-            });
         }
 
         // Read a request from each client, and send a response back. Completes when all clients are responded to, or when the built-in response delay completes.
@@ -487,21 +601,53 @@ namespace MS.MulticastDownloader.Core.Server
             });
         }
 
-        private async Task TransmitUdp(ICollection<MulticastSession> sessions)
+        private void UpdateBurstDelay(ICollection<MulticastConnection> connections)
         {
-            using (CancellationTokenSource statusCts = new CancellationTokenSource())
-            using (CancellationTokenRegistration statusCancellationTokenCanceller = statusCts.Token.Register(() => statusCts.Cancel()))
+            SortedSet<double> receptionRates = new SortedSet<double>();
+            foreach (MulticastConnection conn in connections)
             {
-                Task statusUpdate = this.ProcessStatusUpdates(statusCts.Token);
-                foreach (MulticastSession session in sessions)
-                {
-                    this.token.ThrowIfCancellationRequested();
-                    await session.TransmitWave(this.token);
-                }
-
-                statusCts.Cancel();
-                await statusUpdate;
+                this.log.Trace(conn + " bps: " + conn.BytesPerSecond + ", rr: " + conn.ReceptionRate);
+                receptionRates.Add(conn.ReceptionRate);
             }
+
+            double receptionRate;
+            switch (this.ServerSettings.DelayCalculation)
+            {
+                case DelayCalculation.MinimumThroughput:
+                    receptionRate = receptionRates.Min;
+                    break;
+                case DelayCalculation.MaximumThroughput:
+                    receptionRate = receptionRates.Max;
+                    break;
+                case DelayCalculation.AverageThroughput:
+                    receptionRate = receptionRates.Average();
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            this.receptionRate = new BoxedDouble(receptionRate);
+            int burstDelay = this.BurstDelayMs;
+            if (receptionRate < IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
+            {
+                ++burstDelay;
+            }
+            else if (receptionRate > DecreaseThreshold)
+            {
+                --burstDelay;
+            }
+
+            if (burstDelay < MinBurstDelay)
+            {
+                burstDelay = MinBurstDelay;
+            }
+            else if (burstDelay > MaxBurstDelay)
+            {
+                burstDelay = MaxBurstDelay;
+            }
+
+            this.BurstDelayMs = burstDelay;
+            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay);
         }
 
         private void CancelListen()

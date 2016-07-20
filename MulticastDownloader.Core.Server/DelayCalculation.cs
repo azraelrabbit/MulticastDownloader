@@ -17,6 +17,11 @@ namespace MS.MulticastDownloader.Core.Server
         /// <summary>
         /// Delay calculation by minimum throughput
         /// </summary>
-        MinimumThroughput
+        MinimumThroughput,
+
+        /// <summary>
+        /// Delay calculation by average throughput
+        /// </summary>
+        AverageThroughput
     }
 }
