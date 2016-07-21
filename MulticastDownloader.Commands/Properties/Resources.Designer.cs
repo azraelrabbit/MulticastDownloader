@@ -88,6 +88,15 @@ namespace MS.MulticastDownloader.Commands.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to %.
+        /// </summary>
+        internal static string PercentSign {
+            get {
+                return ResourceManager.GetString("PercentSign", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to reception.
         /// </summary>
         internal static string ReceptionActivity {

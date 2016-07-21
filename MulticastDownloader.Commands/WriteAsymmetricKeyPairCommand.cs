@@ -6,7 +6,6 @@ namespace MS.MulticastDownloader.Commands
 {
     using System.Management.Automation;
     using Common.Logging;
-    using Common.Logging.Simple;
     using Core.Cryptography;
     using PCLStorage;
 
@@ -27,7 +26,7 @@ namespace MS.MulticastDownloader.Commands
             this.Strength = 2048;
             this.PublicKey = "id_pub.rsa";
             this.PrivateKey = "id_priv.rsa";
-            this.LogLevel = Common.Logging.LogLevel.Off;
+            this.LogLevel = LogLevel.Off;
         }
 
         /// <summary>

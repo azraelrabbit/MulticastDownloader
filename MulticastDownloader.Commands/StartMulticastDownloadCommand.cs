@@ -10,12 +10,14 @@ namespace MS.MulticastDownloader.Commands
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
+    using System.Windows.Forms;
     using Common.Logging;
     using Core;
     using Core.Cryptography;
     using Core.IO;
     using PCLStorage;
     using Properties;
+    using Status;
 
     /// <summary>
     /// <para type="synopsis">Starts a multicast download.</para>
@@ -247,6 +249,20 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to display UI status during the download.
+        /// <para type="description">Whether to display UI status during the download.</para>
+        /// </summary>
+        /// <value>
+        ///   <c>true</c> if displaying UI status; otherwise, <c>false</c>.
+        /// </value>
+        [Parameter]
+        public bool DisplayStatus
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Ends the processing.
         /// </summary>
         protected override async void EndProcessing()
@@ -285,15 +301,26 @@ namespace MS.MulticastDownloader.Commands
                 using (MulticastClient client = new MulticastClient(this.Uri, this))
                 {
                     Task transferTask = client.StartTransfer(cts.Token);
-                    while (!transferTask.IsCompleted && !transferTask.IsCanceled && !transferTask.IsFaulted)
+                    if (this.DisplayStatus)
                     {
-                        Thread.Sleep(this.UpdateInterval);
-                        this.WriteTransferProgress(0, client);
-                        this.WriteTransferReception(0, client);
+                        using (StatusViewer viewer = new StatusViewer(client, client, client, this.UpdateInterval))
+                        {
+                            Application.Run(viewer);
+                        }
+                    }
+                    else
+                    {
+                        while (!transferTask.IsCompleted && !transferTask.IsCanceled && !transferTask.IsFaulted)
+                        {
+                            Thread.Sleep(this.UpdateInterval);
+                            this.WriteTransferProgress(0, client);
+                            this.WriteTransferReception(0, client);
+                        }
+
+                        this.WriteTransferProgressComplete(0, client);
+                        this.WriteTransferReceptionComplete(0, client);
                     }
 
-                    this.WriteTransferProgressComplete(0, client);
-                    this.WriteTransferReceptionComplete(0, client);
                     await transferTask;
                 }
             }

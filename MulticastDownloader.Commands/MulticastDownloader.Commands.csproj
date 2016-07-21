@@ -75,6 +75,7 @@
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.IO.FileSystem, Version=4.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.IO.FileSystem.4.0.1\lib\net46\System.IO.FileSystem.dll</HintPath>
       <Private>True</Private>
@@ -88,6 +89,7 @@
       <HintPath>..\packages\Microsoft.PowerShell.5.ReferenceAssemblies.1.0.0\lib\net4\System.Management.Automation.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -107,6 +109,13 @@
     </Compile>
     <Compile Include="StartMulticastDownloadCommand.cs" />
     <Compile Include="StartMulticastServerCommand.cs" />
+    <Compile Include="Status\NamespaceDoc.cs" />
+    <Compile Include="Status\StatusViewer.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Status\StatusViewer.Designer.cs">
+      <DependentUpon>StatusViewer.cs</DependentUpon>
+    </Compile>
     <Compile Include="WriteAsymmetricKeyPairCommand.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -144,6 +153,9 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Status\StatusViewer.resx">
+      <DependentUpon>StatusViewer.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

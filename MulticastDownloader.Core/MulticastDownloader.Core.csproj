@@ -81,6 +81,7 @@
     <Compile Include="IReceptionReporting.cs" />
     <Compile Include="ISequenceReporting.cs" />
     <Compile Include="ITransferReporting.cs" />
+    <Compile Include="SequenceReport.cs" />
     <Compile Include="SessionAbortedException.cs" />
     <Compile Include="Session\BoxedDouble.cs" />
     <Compile Include="Session\ChallengeResponse.cs" />
