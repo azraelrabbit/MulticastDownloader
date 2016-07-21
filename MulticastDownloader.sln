@@ -10,6 +10,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MulticastDownloader.Commands", "MulticastDownloader.Commands\MulticastDownloader.Commands.csproj", "{4D17ABD7-F7D7-4E04-8156-A02A04C9E8B8}"
 EndProject
 Project("{7CF6DF6D-3B04-46F8-A40B-537D21BCA0B4}") = "MulticastDownloader.Documentation", "MulticastDownloader.Documentation\MulticastDownloader.Documentation.shfbproj", "{A5E78F64-9935-47B5-A34F-0E211C262648}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4D17ABD7-F7D7-4E04-8156-A02A04C9E8B8} = {4D17ABD7-F7D7-4E04-8156-A02A04C9E8B8}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{030851F0-CBBE-4DA9-8C5C-5D6D3F37977A}"
 EndProject
