@@ -15,13 +15,15 @@ namespace MS.MulticastDownloader.Commands.Status
     using System.Threading.Tasks;
     using System.Windows.Forms;
     using Core;
+    using Microsoft.WindowsAPICodePack.Shell;
+    using Microsoft.WindowsAPICodePack.Taskbar;
     using Properties;
 
     /// <summary>
     /// A simple multicast status viewer.
     /// </summary>
-    /// <seealso cref="System.Windows.Forms.Form" />
-    public partial class StatusViewer : Form
+    /// <seealso cref="GlassForm" />
+    public partial class StatusViewer : GlassForm
     {
         private ITransferReporting transferReporting;
         private ISequenceReporting sequenceReporting;
@@ -59,6 +61,8 @@ namespace MS.MulticastDownloader.Commands.Status
             this.receptionReporting = receptionReporting;
             this.sequenceReport = new SequenceReport(this.sequenceReporting);
             this.updateInterval = updateInterval;
+            this.ExcludeControlFromAeroGlass(this.BitmapPanel);
+            TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.NoProgress);
         }
 
         /// <summary>
@@ -85,6 +89,7 @@ namespace MS.MulticastDownloader.Commands.Status
             this.sequenceReport.Initialize();
             this.UpdateTimer.Interval = (int)this.updateInterval.TotalMilliseconds;
             this.UpdateTimer.Enabled = true;
+            TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.Indeterminate);
         }
 
         private void UpdateTimer_Tick(object sender, EventArgs e)
@@ -100,7 +105,10 @@ namespace MS.MulticastDownloader.Commands.Status
             if (totalBytes > 0)
             {
                 this.DownloadProgress.Style = ProgressBarStyle.Continuous;
-                this.DownloadProgress.Value = (int)((totalBytes - bytesRemaining) / totalBytes);
+                int percent = (int)((totalBytes - bytesRemaining) / totalBytes);
+                this.DownloadProgress.Value = percent;
+                TaskbarManager.Instance.SetProgressState(TaskbarProgressBarState.Normal);
+                TaskbarManager.Instance.SetProgressValue(percent, 100);
                 this.sequenceReport.Update();
             }
 
