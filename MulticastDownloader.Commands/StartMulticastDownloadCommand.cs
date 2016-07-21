@@ -26,24 +26,13 @@ namespace MS.MulticastDownloader.Commands
     /// <seealso cref="Cmdlet" />
     /// <seealso cref="MulticastClient"/>
     [Cmdlet(VerbsLifecycle.Start, "MulticastDownload")]
-    public class StartMulticastDownloadCommand : Cmdlet, IMulticastSettings
+    public class StartMulticastDownloadCommand : MulticastCmdlet, IMulticastSettings
     {
         private IFolder rootFolder = FileSystem.Current.LocalStorage;
         private string destinationPath;
         private IEncoderFactory encoderFactory;
         private string passPhrase;
         private string publicKey;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="StartMulticastDownloadCommand"/> class.
-        /// </summary>
-        public StartMulticastDownloadCommand()
-        {
-            this.MulticastBufferSize = 1 << 20;
-            this.ReadTimeout = TimeSpan.FromMinutes(10);
-            this.Ttl = 1;
-            this.UpdateInterval = TimeSpan.FromMilliseconds(1000);
-        }
 
         /// <summary>
         /// Gets the encoder used for encoding data and authorizing clients.
@@ -109,34 +98,6 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
-        /// Gets or sets the size of the multicast buffer, in bytes, allocated to temporarily storing outbound or inbound multicast data.
-        /// <para type="description">The size of the multicast buffer, in bytes, allocated to temporarily storing outbound or inbound multicast data.</para>
-        /// </summary>
-        /// <value>
-        /// The size of the multicast buffer.
-        /// </value>
-        [Parameter]
-        public int MulticastBufferSize
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the TCP read timeout used for the session.
-        /// <para type="description">The TCP read timeout used for the session.</para>
-        /// </summary>
-        /// <value>
-        /// The read timeout.
-        /// </value>
-        [Parameter]
-        public TimeSpan ReadTimeout
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
         /// Gets the multicast root folder.
         /// <para type="description">The multicast root folder.</para>
         /// </summary>
@@ -176,79 +137,6 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
-        /// Gets or sets the TTL.
-        /// <para type="description">The multicast TTL.</para>
-        /// </summary>
-        /// <value>
-        /// The TTL.
-        /// </value>
-        /// <remarks>
-        /// A value of 1 should be used if you only want to multicast to clients on your router.
-        /// </remarks>
-        [Parameter]
-        public int Ttl
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the multicast URI.
-        /// <para type="description">The multicast URI.</para>
-        /// </summary>
-        /// <value>
-        /// The multicast URI.
-        /// </value>
-        [Parameter(HelpMessage = "The multicast URI", Mandatory = true)]
-        public Uri Uri
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the log level.
-        /// <para type="description">The log level.</para>
-        /// </summary>
-        /// <value>
-        /// The log level.
-        /// </value>
-        [Parameter]
-        public LogLevel LogLevel
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the log file.
-        /// <para type="description">The log file.</para>
-        /// </summary>
-        /// <value>
-        /// The log file.
-        /// </value>
-        [Parameter]
-        public string LogFile
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the progress update interval.
-        /// <para type="description">The progress update interval.</para>
-        /// </summary>
-        /// <value>
-        /// The update interval.
-        /// </value>
-        [Parameter]
-        public TimeSpan UpdateInterval
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
         /// Gets or sets a value indicating whether to display UI status during the download.
         /// <para type="description">Whether to display UI status during the download.</para>
         /// </summary>
@@ -256,19 +144,20 @@ namespace MS.MulticastDownloader.Commands
         ///   <c>true</c> if displaying UI status; otherwise, <c>false</c>.
         /// </value>
         [Parameter]
-        public bool DisplayStatus
+        public bool DisplayUiStatus
         {
             get;
             set;
         }
 
         /// <summary>
-        /// Ends the processing.
+        /// Runs this instance.
         /// </summary>
-        protected override async void EndProcessing()
+        /// <returns>
+        /// A task object.
+        /// </returns>
+        protected override async Task Run()
         {
-            base.EndProcessing();
-            LogManager.Adapter = new ConsoleLoggerFactoryAdapter(this.LogLevel, this.LogFile);
             this.rootFolder = await FileSystem.Current.LocalStorage.GetFolderAsync(this.destinationPath);
             if (this.rootFolder == null)
             {
@@ -301,7 +190,7 @@ namespace MS.MulticastDownloader.Commands
                 using (MulticastClient client = new MulticastClient(this.Uri, this))
                 {
                     Task transferTask = client.StartTransfer(cts.Token);
-                    if (this.DisplayStatus)
+                    if (this.DisplayUiStatus)
                     {
                         using (StatusViewer viewer = new StatusViewer(client, client, client, this.UpdateInterval))
                         {

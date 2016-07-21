@@ -4,7 +4,9 @@
 
 namespace MS.MulticastDownloader.Commands
 {
+    using System.IO;
     using System.Management.Automation;
+    using System.Threading.Tasks;
     using Common.Logging;
     using Core.Cryptography;
     using PCLStorage;
@@ -16,7 +18,7 @@ namespace MS.MulticastDownloader.Commands
     /// <seealso cref="Cmdlet" />
     /// <seealso cref="SecretWriter"/>
     [Cmdlet(VerbsData.Save, "AsymmetricKeyPair")]
-    public class WriteAsymmetricKeyPairCommand : Cmdlet
+    public class WriteAsymmetricKeyPairCommand : AsyncCmdlet
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="WriteAsymmetricKeyPairCommand"/> class.
@@ -72,40 +74,13 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
-        /// Gets or sets the log level.
-        /// <para type="description">The log level.</para>
+        /// Runs this instance.
         /// </summary>
-        /// <value>
-        /// The log level.
-        /// </value>
-        [Parameter]
-        public LogLevel LogLevel
+        /// <returns>
+        /// A task object.
+        /// </returns>
+        protected override async Task Run()
         {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the log file.
-        /// <para type="description">The log file.</para>
-        /// </summary>
-        /// <value>
-        /// The log file.
-        /// </value>
-        [Parameter]
-        public string LogFile
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Ends the processing.
-        /// </summary>
-        protected override async void EndProcessing()
-        {
-            base.EndProcessing();
-            LogManager.Adapter = new ConsoleLoggerFactoryAdapter(this.LogLevel, this.LogFile);
             await SecretWriter.WriteAsymmetricKeyPair(FileSystem.Current.LocalStorage, this.PrivateKey, this.PublicKey, this.Strength);
         }
     }

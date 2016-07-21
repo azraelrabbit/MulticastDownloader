@@ -26,7 +26,7 @@ namespace MS.MulticastDownloader.Commands
     /// <seealso cref="Cmdlet" />
     /// <seealso cref="MulticastServer" />
     [Cmdlet(VerbsLifecycle.Start, "MulticastServer")]
-    public class StartMulticastServerCommand : Cmdlet, IMulticastSettings, IMulticastServerSettings
+    public class StartMulticastServerCommand : MulticastCmdlet, IMulticastSettings, IMulticastServerSettings
     {
         private ILog log = LogManager.GetLogger<StartMulticastServerCommand>();
         private IFolder rootFolder = FileSystem.Current.LocalStorage;
@@ -41,16 +41,12 @@ namespace MS.MulticastDownloader.Commands
         public StartMulticastServerCommand()
         {
             this.DelayCalculation = DelayCalculation.MinimumThroughput;
-            this.MulticastBufferSize = 1 << 20;
-            this.ReadTimeout = TimeSpan.FromMinutes(10);
-            this.Ttl = 1;
             this.MaxBytesPerSecond = long.MaxValue;
             this.MaxConnections = 10;
             this.MaxSessions = 10;
             this.Mtu = 1500;
             this.MulticastAddress = "239.0.0.1";
             this.MulticastStartPort = 0xFF00;
-            this.UpdateInterval = TimeSpan.FromMilliseconds(1000);
         }
 
         /// <summary>
@@ -280,34 +276,6 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
-        /// Gets or sets the size of the multicast buffer, in bytes, allocated to temporarily storing outbound or inbound multicast data.
-        /// <para type="description">The size of the multicast buffer, in bytes, allocated to temporarily storing outbound or inbound multicast data.</para>
-        /// </summary>
-        /// <value>
-        /// The size of the multicast buffer.
-        /// </value>
-        [Parameter]
-        public int MulticastBufferSize
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the TCP read timeout used for the session.
-        /// <para type="description">The TCP read timeout used for the session.</para>
-        /// </summary>
-        /// <value>
-        /// The read timeout.
-        /// </value>
-        [Parameter]
-        public TimeSpan ReadTimeout
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
         /// Gets the multicast root folder.
         /// <para type="description">The multicast root folder.</para>
         /// </summary>
@@ -323,20 +291,6 @@ namespace MS.MulticastDownloader.Commands
             {
                 return this.rootFolder;
             }
-        }
-
-        /// <summary>
-        /// Gets or sets the multicast URI.
-        /// <para type="description">The multicast URI.</para>
-        /// </summary>
-        /// <value>
-        /// The multicast URI.
-        /// </value>
-        [Parameter(HelpMessage = "The multicast URI", Mandatory = true)]
-        public Uri Uri
-        {
-            get;
-            set;
         }
 
         /// <summary>
@@ -361,72 +315,11 @@ namespace MS.MulticastDownloader.Commands
         }
 
         /// <summary>
-        /// Gets or sets the TTL.
-        /// <para type="description">The multicast TTL.</para>
+        /// Runs this instance.
         /// </summary>
-        /// <value>
-        /// The TTL.
-        /// </value>
-        /// <remarks>
-        /// A value of 1 should be used if you only want to multicast to clients on your router.
-        /// </remarks>
-        [Parameter]
-        public int Ttl
+        /// <returns>A task object.</returns>
+        protected override async Task Run()
         {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the log level.
-        /// <para type="description">The log level.</para>
-        /// </summary>
-        /// <value>
-        /// The log level.
-        /// </value>
-        [Parameter]
-        public LogLevel LogLevel
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the log file.
-        /// <para type="description">The log file.</para>
-        /// </summary>
-        /// <value>
-        /// The log file.
-        /// </value>
-        [Parameter]
-        public string LogFile
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Gets or sets the progress update interval.
-        /// <para type="description">The progress update interval.</para>
-        /// </summary>
-        /// <value>
-        /// The update interval.
-        /// </value>
-        [Parameter]
-        public TimeSpan UpdateInterval
-        {
-            get;
-            set;
-        }
-
-        /// <summary>
-        /// Ends the processing.
-        /// </summary>
-        protected override async void EndProcessing()
-        {
-            base.EndProcessing();
-
-            LogManager.Adapter = new ConsoleLoggerFactoryAdapter(this.LogLevel, this.LogFile);
             this.rootFolder = await FileSystem.Current.LocalStorage.GetFolderAsync(this.sourcePath);
             if (this.rootFolder == null)
             {

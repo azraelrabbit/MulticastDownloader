@@ -10,7 +10,7 @@ namespace MS.MulticastDownloader.Commands
 
     internal static class CmdletExtensionMethods
     {
-        internal static void WriteTransferProgress(this Cmdlet cmdlet, int activityId, ITransferReporting transferReporting)
+        internal static void WriteTransferProgress(this AsyncCmdlet cmdlet, int activityId, ITransferReporting transferReporting)
         {
             ProgressRecord record;
             record = new ProgressRecord(activityId, Resources.DownloadActivity, transferReporting + " " + Resources.DownloadStatus);
@@ -28,19 +28,21 @@ namespace MS.MulticastDownloader.Commands
                 }
             }
 
-            cmdlet.WriteProgress(record);
+            cmdlet.UiInvoke((c) => c.WriteProgress(record))
+                  .Wait();
         }
 
-        internal static void WriteTransferProgressComplete(this Cmdlet cmdlet, int activityId, ITransferReporting transferReporting)
+        internal static void WriteTransferProgressComplete(this AsyncCmdlet cmdlet, int activityId, ITransferReporting transferReporting)
         {
             ProgressRecord record;
             record = new ProgressRecord(activityId, Resources.DownloadActivity, transferReporting + " " + Resources.DownloadStatus);
             record.PercentComplete = record.SecondsRemaining = -1;
             record.RecordType = ProgressRecordType.Completed;
-            cmdlet.WriteProgress(record);
+            cmdlet.UiInvoke((c) => c.WriteProgress(record))
+                  .Wait();
         }
 
-        internal static void WriteTransferReception(this Cmdlet cmdlet, int activityId, IReceptionReporting receptionReporting)
+        internal static void WriteTransferReception(this AsyncCmdlet cmdlet, int activityId, IReceptionReporting receptionReporting)
         {
             ProgressRecord record;
             record = new ProgressRecord(activityId, Resources.ReceptionActivity, receptionReporting + " " + Resources.ReceptionStatus);
@@ -48,16 +50,18 @@ namespace MS.MulticastDownloader.Commands
             record.RecordType = ProgressRecordType.Processing;
             double receptionRate = receptionReporting.ReceptionRate;
             record.PercentComplete = (int)(100.0 * receptionRate);
-            cmdlet.WriteProgress(record);
+            cmdlet.UiInvoke((c) => c.WriteProgress(record))
+                  .Wait();
         }
 
-        internal static void WriteTransferReceptionComplete(this Cmdlet cmdlet, int activityId, IReceptionReporting receptionReporting)
+        internal static void WriteTransferReceptionComplete(this AsyncCmdlet cmdlet, int activityId, IReceptionReporting receptionReporting)
         {
             ProgressRecord record;
             record = new ProgressRecord(activityId, Resources.ReceptionActivity, receptionReporting + " " + Resources.ReceptionStatus);
             record.PercentComplete = record.SecondsRemaining = -1;
             record.RecordType = ProgressRecordType.Completed;
-            cmdlet.WriteProgress(record);
+            cmdlet.UiInvoke((c) => c.WriteProgress(record))
+                  .Wait();
         }
     }
 }
