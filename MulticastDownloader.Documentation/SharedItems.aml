@@ -1,0 +1,14 @@
+﻿<?xml version="1.0"?>
+<doc>
+  <assembly>
+    <name>_SharedItems_</name>
+  </assembly>
+  <members>
+    <member name="G:MS.MulticastDownloader">
+      <summary>
+        The <see cref="G:MS.MulticastDownloader"/> namespace contains classes, enumerations and structures for hosting, and running, Multicast Downloads.
+        See the <see cref="N:MS.MulticastDownloader.Core"/> or <see cref="N:MS.MulticastDownloader.Core.Server"/> namespaces for more information.
+      </summary>
+    </member>
+  </members>
+</doc>

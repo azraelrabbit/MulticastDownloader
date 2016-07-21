@@ -13,7 +13,7 @@
     <RootNamespace>MulticastDownloader.Documentation</RootNamespace>
     <Name>MulticastDownloader.Documentation</Name>
     <!-- SHFB properties -->
-    <FrameworkVersion>.NET Portable Library 4.6</FrameworkVersion>
+    <FrameworkVersion>.NET Framework 4.5.1</FrameworkVersion>
     <OutputPath>.\Help\</OutputPath>
     <HtmlHelpName>MS.MulticastDownloader.Documentation</HtmlHelpName>
     <Language>en-US</Language>
@@ -27,8 +27,27 @@
       <Argument Key="maxVersionParts" Value="" xmlns="" />
     </TransformComponentArguments>
     <DocumentationSources>
-      <DocumentationSource sourceFile="..\MulticastDownloader.Core.Server\MulticastDownloader.Core.Server.csproj" />
-      <DocumentationSource sourceFile="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\MulticastDownloader.Commands.csproj" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.Server.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.Server.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Common.Logging.Core.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Common.Logging.Core.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Common.Logging.Portable.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Common.Logging.Portable.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\crypto.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\crypto.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\PCLStorage.Abstractions.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\PCLStorage.Abstractions.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\PCLStorage.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\PCLStorage.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\protobuf-net.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\protobuf-net.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Sockets.Plugin.Abstractions.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Sockets.Plugin.Abstractions.dll" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Sockets.Plugin.xml" />
+      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\Sockets.Plugin.dll" />
     </DocumentationSources>
     <BuildAssemblerVerbosity>OnlyWarningsAndErrors</BuildAssemblerVerbosity>
     <HelpFileFormat>Markdown</HelpFileFormat>
@@ -91,24 +110,8 @@
       </ComponentConfig>
     </ComponentConfigurations>
     <PlugInConfigurations>
-      <PlugInConfig id="Assembly Binding Redirection" enabled="True">
-        <configuration useGAC="true">
-          <assemblyBinding />
-          <ignoreIfUnresolved>
-            <assemblyIdentity name="BusinessObjects.Licensing.KeycodeDecoder" />
-            <assemblyIdentity name="Microsoft.VisualStudio.TestTools.UITest.Playback" />
-          </ignoreIfUnresolved>
-        </configuration>
-      </PlugInConfig>
-      <PlugInConfig id="Version Builder" enabled="True">
-        <configuration>
-          <currentProject label=".Net Portable" version="4.6" ripOldApis="True" />
-          <versions>
-            <version label=".Net, Version: 4.6" version="1.0" helpFileProject="..\MulticastDownloader.Commands.Documentation\MulticastDownloader.Commands.Documentation.shfbproj" />
-          </versions>
-        </configuration>
-      </PlugInConfig>
     </PlugInConfigurations>
+    <SaveComponentCacheCapacity>100</SaveComponentCacheCapacity>
   </PropertyGroup>
   <!-- There are no properties for these groups.  AnyCPU needs to appear in order for Visual Studio to perform
 			 the build.  The others are optional common platform types that may appear. -->
