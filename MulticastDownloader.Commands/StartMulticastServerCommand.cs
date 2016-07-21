@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Commands
     using System;
     using System.IO;
     using System.Management.Automation;
+    using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
@@ -27,6 +28,7 @@ namespace MS.MulticastDownloader.Commands
     [Cmdlet(VerbsLifecycle.Start, "MulticastServer")]
     public class StartMulticastServerCommand : Cmdlet, IMulticastSettings, IMulticastServerSettings
     {
+        private ILog log = LogManager.GetLogger<StartMulticastServerCommand>();
         private IFolder rootFolder = FileSystem.Current.LocalStorage;
         private string sourcePath;
         private IEncoderFactory encoderFactory;
@@ -455,6 +457,12 @@ namespace MS.MulticastDownloader.Commands
                     }
                 };
 
+                uint timerRet = NativeMethods.timeBeginPeriod(1);
+                if (timerRet != 0)
+                {
+                    this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
+                }
+
                 using (MulticastServer server = new MulticastServer(this.Uri, this, this))
                 {
                     Task hostTask = server.Listen(cts.Token);
@@ -478,7 +486,22 @@ namespace MS.MulticastDownloader.Commands
 
                     await hostTask;
                 }
+
+                timerRet = NativeMethods.timeEndPeriod(1);
+                if (timerRet != 0)
+                {
+                    this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
+                }
             }
+        }
+
+        private static class NativeMethods
+        {
+            [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+            internal static extern uint timeBeginPeriod(uint uMilliseconds);
+
+            [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+            internal static extern uint timeEndPeriod(uint uMilliseconds);
         }
     }
 }
