@@ -175,44 +175,30 @@ namespace MS.MulticastDownloader.Commands
                 this.encoderFactory = await AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, this.publicKey, AsymmetricSecretFlags.None);
             }
 
-            using (CancellationTokenSource cts = new CancellationTokenSource())
+            using (MulticastClient client = new MulticastClient(this.Uri, this))
             {
-                bool canceled = false;
-                Console.CancelKeyPress += (o, e) =>
+                Task transferTask = client.StartTransfer(this.Token);
+                if (this.DisplayUiStatus)
                 {
-                    if (!canceled)
+                    using (StatusViewer viewer = new StatusViewer(client, client, client, this.UpdateInterval))
                     {
-                        Console.Out.WriteLine(Resources.CtrlCPressed);
-                        canceled = true;
-                        e.Cancel = true;
-                        cts.Cancel();
+                        Application.Run(viewer);
                     }
-                };
-                using (MulticastClient client = new MulticastClient(this.Uri, this))
-                {
-                    Task transferTask = client.StartTransfer(cts.Token);
-                    if (this.DisplayUiStatus)
-                    {
-                        using (StatusViewer viewer = new StatusViewer(client, client, client, this.UpdateInterval))
-                        {
-                            Application.Run(viewer);
-                        }
-                    }
-                    else
-                    {
-                        while (!transferTask.IsCompleted && !transferTask.IsCanceled && !transferTask.IsFaulted)
-                        {
-                            Thread.Sleep(this.UpdateInterval);
-                            this.WriteTransferProgress(0, client);
-                            this.WriteTransferReception(0, client);
-                        }
-
-                        this.WriteTransferProgressComplete(0, client);
-                        this.WriteTransferReceptionComplete(0, client);
-                    }
-
-                    await transferTask;
                 }
+                else
+                {
+                    while (!transferTask.IsCompleted && !transferTask.IsCanceled && !transferTask.IsFaulted)
+                    {
+                        Thread.Sleep(this.UpdateInterval);
+                        this.WriteTransferProgress(0, client);
+                        this.WriteTransferReception(0, client);
+                    }
+
+                    this.WriteTransferProgressComplete(0, client);
+                    this.WriteTransferReceptionComplete(0, client);
+                }
+
+                await transferTask;
             }
         }
     }

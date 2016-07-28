@@ -19,9 +19,10 @@ namespace MS.MulticastDownloader.Commands
     /// Represent a base for Async commandlets.
     /// </summary>
     /// <seealso cref="Cmdlet" />
-    public abstract class AsyncCmdlet : Cmdlet
+    public abstract class AsyncCmdlet : Cmdlet, IDisposable
 #pragma warning restore CA1001 // Types that own disposable fields should be disposable
     {
+        private bool disposedValue = false;
         private Thread psThread;
         private AutoResetEvent actionQueuedEvent = new AutoResetEvent(false);
         private ConcurrentQueue<Action> pendingActions = new ConcurrentQueue<Action>();
@@ -52,6 +53,14 @@ namespace MS.MulticastDownloader.Commands
         {
             get;
             set;
+        }
+
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
+        public void Dispose()
+        {
+            this.Dispose(true);
         }
 
         internal Task UiInvoke(Action<Cmdlet> cmdletAction)
@@ -116,11 +125,27 @@ namespace MS.MulticastDownloader.Commands
                     logger.Dispose();
                 }
 
-                if (this.actionQueuedEvent != null)
+                this.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!this.disposedValue)
+            {
+                if (disposing)
                 {
-                    this.actionQueuedEvent.Close();
-                    this.actionQueuedEvent.Dispose();
+                    if (this.actionQueuedEvent != null)
+                    {
+                        this.actionQueuedEvent.Dispose();
+                    }
                 }
+
+                this.disposedValue = true;
             }
         }
 

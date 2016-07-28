@@ -5,10 +5,14 @@
 namespace MS.MulticastDownloader.Commands
 {
     using System;
+    using System.IO;
     using System.Management.Automation;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Core;
     using Core.Cryptography;
     using PCLStorage;
+    using Properties;
 
     /// <summary>
     /// Represent a base class for Multicast commandlets.
@@ -16,6 +20,10 @@ namespace MS.MulticastDownloader.Commands
     /// <seealso cref="MS.MulticastDownloader.Commands.AsyncCmdlet" />
     public abstract class MulticastCmdlet : AsyncCmdlet
     {
+        private CancellationTokenSource ctrlCCanceler = new CancellationTokenSource();
+        private bool canceled = false;
+        private bool disposed = false;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MulticastCmdlet"/> class.
         /// </summary>
@@ -25,6 +33,32 @@ namespace MS.MulticastDownloader.Commands
             this.ReadTimeout = TimeSpan.FromMinutes(10);
             this.Ttl = 1;
             this.UpdateInterval = TimeSpan.FromMilliseconds(1000);
+            bool canceled = false;
+
+            Console.CancelKeyPress += (o, e) =>
+            {
+                if (!canceled)
+                {
+                    Console.Out.WriteLine(Resources.CtrlCPressed);
+                    canceled = true;
+                    e.Cancel = true;
+                    this.ctrlCCanceler.Cancel();
+                }
+            };
+        }
+
+        /// <summary>
+        /// Gets the token.
+        /// </summary>
+        /// <value>
+        /// The token.
+        /// </value>
+        public CancellationToken Token
+        {
+            get
+            {
+                return this.ctrlCCanceler.Token;
+            }
         }
 
         /// <summary>
@@ -98,6 +132,27 @@ namespace MS.MulticastDownloader.Commands
         {
             get;
             set;
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+
+            if (!this.disposed)
+            {
+                this.disposed = true;
+                if (disposing)
+                {
+                    if (this.ctrlCCanceler != null)
+                    {
+                        this.ctrlCCanceler.Dispose();
+                    }
+                }
+            }
         }
     }
 }

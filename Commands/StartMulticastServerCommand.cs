@@ -336,55 +336,40 @@ namespace MS.MulticastDownloader.Commands
                 this.encoderFactory = await AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, this.privateKey, AsymmetricSecretFlags.ReadPrivateKey);
             }
 
-            using (CancellationTokenSource cts = new CancellationTokenSource())
+            uint timerRet = NativeMethods.timeBeginPeriod(1);
+            if (timerRet != 0)
             {
-                bool canceled = false;
-                Console.CancelKeyPress += (o, e) =>
-                {
-                    if (!canceled)
-                    {
-                        Console.Out.WriteLine(Resources.CtrlCPressed);
-                        canceled = true;
-                        e.Cancel = true;
-                        cts.Cancel();
-                    }
-                };
+                this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
+            }
 
-                uint timerRet = NativeMethods.timeBeginPeriod(1);
-                if (timerRet != 0)
+            using (MulticastServer server = new MulticastServer(this.Uri, this, this))
+            {
+                Task hostTask = server.Listen(this.Token);
+                while (!hostTask.IsCompleted && !hostTask.IsCanceled && !hostTask.IsFaulted)
                 {
-                    this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
-                }
-
-                using (MulticastServer server = new MulticastServer(this.Uri, this, this))
-                {
-                    Task hostTask = server.Listen(cts.Token);
-                    while (!hostTask.IsCompleted && !hostTask.IsCanceled && !hostTask.IsFaulted)
-                    {
-                        Thread.Sleep(this.UpdateInterval);
-                        this.WriteTransferProgress(0, server);
-                        this.WriteTransferReception(0, server);
-                        foreach (MulticastSession session in server.Sessions)
-                        {
-                            this.WriteTransferProgress(1 + session.SessionId, session);
-                        }
-                    }
-
-                    this.WriteTransferProgressComplete(0, server);
-                    this.WriteTransferReceptionComplete(0, server);
+                    await Task.Delay(this.UpdateInterval, this.Token);
+                    this.WriteTransferProgress(0, server);
+                    this.WriteTransferReception(0, server);
                     foreach (MulticastSession session in server.Sessions)
                     {
-                        this.WriteTransferProgressComplete(1 + session.SessionId, session);
+                        this.WriteTransferProgress(1 + session.SessionId, session);
                     }
-
-                    await hostTask;
                 }
 
-                timerRet = NativeMethods.timeEndPeriod(1);
-                if (timerRet != 0)
+                this.WriteTransferProgressComplete(0, server);
+                this.WriteTransferReceptionComplete(0, server);
+                foreach (MulticastSession session in server.Sessions)
                 {
-                    this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
+                    this.WriteTransferProgressComplete(1 + session.SessionId, session);
                 }
+
+                await hostTask;
+            }
+
+            timerRet = NativeMethods.timeEndPeriod(1);
+            if (timerRet != 0)
+            {
+                this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
             }
         }
 
