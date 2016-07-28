@@ -5,6 +5,7 @@
     "Common.Logging.Portable": "3.3.1",
     "EWSoftware.SHFB.NETPortable": "4.6.0",
     "Microsoft.AnalyzerPowerPack": "1.1.0",
+    "Microsoft.CodeAnalysis.Analyzers": "1.1.0",
     "MsBuild.NuGet.Pack": "2.0.0",
     "PCLStorage": "1.0.2",
     "protobuf-net": "2.0.0.668",

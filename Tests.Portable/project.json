@@ -4,6 +4,7 @@
     "Common.Logging.Core": "3.3.1",
     "Common.Logging.Portable": "3.3.1",
     "Microsoft.AnalyzerPowerPack": "1.1.0",
+    "Microsoft.CodeAnalysis.Analyzers": "1.1.0",
     "PCLStorage": "1.0.2",
     "StyleCop.Analyzers": "1.0.0",
     "System.Runtime.Analyzers": "1.1.0",
