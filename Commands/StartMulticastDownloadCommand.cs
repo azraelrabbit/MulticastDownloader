@@ -158,10 +158,11 @@ namespace MS.MulticastDownloader.Commands
         /// </returns>
         protected override async Task Run()
         {
-            this.rootFolder = await FileSystem.Current.LocalStorage.GetFolderAsync(this.destinationPath);
+            this.rootFolder = await FileSystem.Current.GetFolderFromPathAsync(this.destinationPath);
             if (this.rootFolder == null)
             {
-                this.rootFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync(this.destinationPath, CreationCollisionOption.ReplaceExisting);
+                IFolder curDir = await FileSystem.Current.GetFolderFromPathAsync(Environment.CurrentDirectory);
+                this.rootFolder = await curDir.CreateFolderAsync(this.destinationPath, CreationCollisionOption.ReplaceExisting);
             }
 
             if (!string.IsNullOrEmpty(this.passPhrase))

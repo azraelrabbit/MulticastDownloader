@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Commands
 {
+    using System;
     using System.IO;
     using System.Management.Automation;
     using System.Threading.Tasks;
@@ -81,7 +82,8 @@ namespace MS.MulticastDownloader.Commands
         /// </returns>
         protected override async Task Run()
         {
-            await SecretWriter.WriteAsymmetricKeyPair(FileSystem.Current.LocalStorage, this.PrivateKey, this.PublicKey, this.Strength);
+            IFolder curDir = await FileSystem.Current.GetFolderFromPathAsync(Environment.CurrentDirectory);
+            await SecretWriter.WriteAsymmetricKeyPair(curDir, this.PrivateKey, this.PublicKey, this.Strength);
         }
     }
 }

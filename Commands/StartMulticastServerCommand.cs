@@ -320,7 +320,7 @@ namespace MS.MulticastDownloader.Commands
         /// <returns>A task object.</returns>
         protected override async Task Run()
         {
-            this.rootFolder = await FileSystem.Current.LocalStorage.GetFolderAsync(this.sourcePath);
+            this.rootFolder = await FileSystem.Current.GetFolderFromPathAsync(this.sourcePath);
             if (this.rootFolder == null)
             {
                 throw new FileNotFoundException(Resources.SourcePathNotFound, this.sourcePath);
