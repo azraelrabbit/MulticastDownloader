@@ -48,7 +48,7 @@
     <AdditionalFiles Include="..\stylecop.json">
       <Link>stylecop.json</Link>
     </AdditionalFiles>
-    <None Include="MulticastDownloader.core.nuspec" />
+    <None Include="Core.nuspec" />
     <None Include="MulticastDownloader.Core.ruleset" />
     <None Include="project.json" />
     <!-- A reference to the entire .NET Framework is automatically included -->
@@ -103,7 +103,6 @@
     <Compile Include="Session\Challenge.cs" />
     <Compile Include="Session\FileBlockRange.cs" />
     <Compile Include="Session\FileChunk.cs" />
-    <Compile Include="Session\FileEnumerator.cs" />
     <Compile Include="Session\FileHeader.cs" />
     <Compile Include="Session\FileSegment.cs" />
     <Compile Include="Session\FileSet.cs" />

@@ -57,6 +57,7 @@
     <Compile Include="Session\FileHeaderTest.cs" />
     <Compile Include="IO\FileSystemTest.cs" />
     <Compile Include="Session\FileSetTest.cs" />
+    <Compile Include="Session\ThroughputCalculatorTest.cs" />
     <Compile Include="TestOutputLoggerFactoryAdapter.cs" />
     <Compile Include="Util\Runtime.cs" />
   </ItemGroup>
@@ -64,17 +65,17 @@
     <AdditionalFiles Include="stylecop.json" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MulticastDownloader.Core.Server\MulticastDownloader.Core.Server.csproj">
-      <Project>{9daff580-78ce-4257-8c23-23824d945fff}</Project>
-      <Name>MulticastDownloader.Core.Server</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj">
-      <Project>{a3d2164b-81c4-4784-a647-783a7dbcd164}</Project>
-      <Name>MulticastDownloader.Core</Name>
-    </ProjectReference>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+    <ProjectReference Include="..\Core.Server\Core.Server.csproj">
+      <Project>{9daff580-78ce-4257-8c23-23824d945fff}</Project>
+      <Name>Core.Server</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Core\Core.csproj">
+      <Project>{a3d2164b-81c4-4784-a647-783a7dbcd164}</Project>
+      <Name>Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -11,7 +11,7 @@
     <!-- AssemblyName, Name, and RootNamespace are not used by SHFB but Visual Studio adds them anyway -->
     <AssemblyName>MulticastDownloader.Documentation</AssemblyName>
     <RootNamespace>MulticastDownloader.Documentation</RootNamespace>
-    <Name>MulticastDownloader.Documentation</Name>
+    <Name>Documentation</Name>
     <!-- SHFB properties -->
     <FrameworkVersion>.NET Framework 4.5.1</FrameworkVersion>
     <OutputPath>.\Help\</OutputPath>
@@ -27,11 +27,11 @@
       <Argument Key="maxVersionParts" Value="" xmlns="" />
     </TransformComponentArguments>
     <DocumentationSources>
-      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\MulticastDownloader.Commands.csproj" />
-      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.Server.xml" />
-      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.Server.dll" />
-      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.xml" />
-      <DocumentationSource sourceFile="..\MulticastDownloader.Commands\bin\Release\MS.MulticastDownloader.Core.dll" />
+      <DocumentationSource sourceFile="..\Commands\bin\Release\MS.MulticastDownloader.Core.Server.xml" />
+      <DocumentationSource sourceFile="..\Commands\bin\Release\MS.MulticastDownloader.Core.Server.dll" />
+      <DocumentationSource sourceFile="..\Commands\bin\Release\MS.MulticastDownloader.Core.xml" />
+      <DocumentationSource sourceFile="..\Commands\bin\Release\MS.MulticastDownloader.Core.dll" />
+      <DocumentationSource sourceFile="..\Commands\Commands.csproj" />
     </DocumentationSources>
     <BuildAssemblerVerbosity>OnlyWarningsAndErrors</BuildAssemblerVerbosity>
     <HelpFileFormat>Markdown</HelpFileFormat>
@@ -134,18 +134,18 @@
     <Content Include="icons\Help.png" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MulticastDownloader.Commands\MulticastDownloader.Commands.csproj">
-      <Name>MulticastDownloader.Commands</Name>
+    <ProjectReference Include="..\Commands\Commands.csproj">
+      <Name>Commands</Name>
       <Project>{4d17abd7-f7d7-4e04-8156-a02a04c9e8b8}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\MulticastDownloader.Core.Server\MulticastDownloader.Core.Server.csproj">
-      <Name>MulticastDownloader.Core.Server</Name>
+    <ProjectReference Include="..\Core.Server\Core.Server.csproj">
+      <Name>Core.Server</Name>
       <Project>{9daff580-78ce-4257-8c23-23824d945fff}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj">
-      <Name>MulticastDownloader.Core</Name>
+    <ProjectReference Include="..\Core\Core.csproj">
+      <Name>Core</Name>
       <Project>{a3d2164b-81c4-4784-a647-783a7dbcd164}</Project>
       <Private>True</Private>
     </ProjectReference>

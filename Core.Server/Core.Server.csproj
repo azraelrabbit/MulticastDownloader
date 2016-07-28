@@ -47,7 +47,7 @@
     <AdditionalFiles Include="..\stylecop.json">
       <Link>stylecop.json</Link>
     </AdditionalFiles>
-    <None Include="MulticastDownloader.Core.Server.nuspec" />
+    <None Include="Core.Server.nuspec" />
     <None Include="MulticastDownloader.Core.Server.ruleset" />
     <None Include="project.json" />
     <!-- A reference to the entire .NET Framework is automatically included -->
@@ -76,9 +76,9 @@
     <Compile Include="ServerBase.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\MulticastDownloader.Core\MulticastDownloader.Core.csproj">
+    <ProjectReference Include="..\Core\Core.csproj">
       <Project>{a3d2164b-81c4-4784-a647-783a7dbcd164}</Project>
-      <Name>MulticastDownloader.Core</Name>
+      <Name>Core</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

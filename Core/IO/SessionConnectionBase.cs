@@ -21,9 +21,11 @@ namespace MS.MulticastDownloader.Core.IO
 
     internal class SessionConnectionBase : ConnectionBase
     {
+#pragma warning disable CA2213
         private Stream tlsStream;
         private Stream outStream;
         private Stream inStream;
+#pragma warning restore CA2213
         private ILog log = LogManager.GetLogger<ClientConnection>();
         private bool tcpListen;
         private bool disposed;

@@ -63,7 +63,9 @@ namespace MS.MulticastDownloader.Commands
         private class ConsoleOutputLogger : AbstractSimpleLogger
         {
             private AsyncCmdlet cmdlet;
+#pragma warning disable CA2213
             private StreamWriter logFile;
+#pragma warning restore CA2213
             private string key;
 
             internal ConsoleOutputLogger(string key, AsyncCmdlet cmdlet, StreamWriter logFile)
