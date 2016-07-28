@@ -35,8 +35,9 @@ namespace MS.MulticastDownloader.Core.Session
 
         internal long UpdateThroughput(long bytesRemaining, DateTime when)
         {
-            Contract.Requires(this.lastUpdate > DateTime.MinValue);
-            this.bytesPerSecondAtInterval[this.nextInterval] = (long)((double)(bytesRemaining - this.bytesLeft) / (when - this.lastUpdate).TotalSeconds);
+            Contract.Requires(when >= this.lastUpdate);
+            Contract.Requires(this.bytesLeft >= bytesRemaining);
+            this.bytesPerSecondAtInterval[this.nextInterval] = (long)((double)(this.bytesLeft - bytesRemaining) / (when - this.lastUpdate).TotalSeconds);
             this.nextInterval = (this.nextInterval + 1) % this.maxIntervals;
             this.bytesLeft = bytesRemaining;
             this.lastUpdate = when;

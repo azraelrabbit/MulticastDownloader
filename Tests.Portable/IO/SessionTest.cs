@@ -59,7 +59,7 @@ namespace MS.MulticastDownloader.Tests.IO
                         {
                             UseTls = true,
                             Hostname = "localhost",
-                            Port = 8001,
+                            Port = 8002,
                             Path = "foo"
                         },
                         new TestSettings(true),
