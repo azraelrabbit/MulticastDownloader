@@ -19,18 +19,20 @@ namespace MS.MulticastDownloader.Core.IO
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class UdpReader : ConnectionBase
+    internal class UdpReader<TReader> : ConnectionBase
+        where TReader : IUdpMulticast, new()
     {
         private const int ReadDelay = 1000;
-        private ILog log = LogManager.GetLogger<UdpReader>();
+        private ILog log = LogManager.GetLogger<UdpReader<TReader>>();
         private IEncoderFactory encoder;
-        private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
+        private TReader multicastClient = new TReader();
         private int bufferUse = 0;
         private int bufferSize;
+        private AutoResetEvent packetQueuedEvent = new AutoResetEvent(false);
+        private Task readTask;
+        private CancellationTokenSource readCts = new CancellationTokenSource();
         private ConcurrentQueue<byte[]> multicastPackets = new ConcurrentQueue<byte[]>();
         private ConcurrentBag<IDecoder> encoders = new ConcurrentBag<IDecoder>();
-        private AutoResetEvent packetQueuedEvent = new AutoResetEvent(false);
-        private bool udpListen;
         private bool disposed;
 
         internal UdpReader(UriParameters parms, IMulticastSettings settings)
@@ -38,21 +40,10 @@ namespace MS.MulticastDownloader.Core.IO
         {
         }
 
-        internal UdpSocketMulticastClient MulticastClient
-        {
-            get
-            {
-                return this.multicastClient;
-            }
-        }
-
         internal async Task JoinMulticastServer(SessionJoinResponse response, IEncoderFactory encoder)
         {
             Contract.Requires(response != null);
             this.encoder = encoder;
-            this.udpListen = true;
-            this.multicastClient.TTL = this.Settings.Ttl;
-            this.MulticastClient.MessageReceived += this.MulticastPacketReceived;
             this.bufferSize = this.Settings.MulticastBufferSize;
             int blockSize = SessionJoinResponse.GetBlockSize(response.Mtu, response.Ipv6);
             if (blockSize * response.MulticastBurstLength > this.bufferSize)
@@ -61,17 +52,26 @@ namespace MS.MulticastDownloader.Core.IO
             }
 
             this.log.DebugFormat("UDP reader size: {0} bytes", this.bufferSize);
-            await this.multicastClient.JoinMulticastGroupAsync(response.MulticastAddress, response.MulticastPort);
+            await this.multicastClient.Connect(null, response.MulticastAddress, response.MulticastPort, this.Settings.Ttl);
+            this.readTask = this.multicastClient.Read(this.PacketRead, this.readCts.Token);
         }
 
         internal override async Task Close()
         {
             await base.Close();
-            if (this.udpListen)
+            this.readCts.Cancel();
+            if (this.readTask != null)
             {
-                this.MulticastClient.MessageReceived -= this.MulticastPacketReceived;
-                await this.multicastClient.DisconnectAsync();
+                try
+                {
+                    await this.readTask;
+                }
+                catch (OperationCanceledException)
+                {
+                }
             }
+
+            await this.multicastClient.Close();
         }
 
         internal async Task<IEnumerable<T>> ReceiveMulticast<T>(CancellationToken token)
@@ -132,9 +132,9 @@ namespace MS.MulticastDownloader.Core.IO
             if (!this.disposed)
             {
                 this.disposed = true;
-                if (this.packetQueuedEvent != null)
+                if (this.readCts != null)
                 {
-                    this.packetQueuedEvent.Dispose();
+                    this.readCts.Dispose();
                 }
 
                 if (this.multicastClient != null)
@@ -142,20 +142,25 @@ namespace MS.MulticastDownloader.Core.IO
                     this.multicastClient.Dispose();
                 }
 
+                if (this.packetQueuedEvent != null)
+                {
+                    this.packetQueuedEvent.Dispose();
+                }
+
                 this.multicastPackets = null;
             }
         }
 
-        private void MulticastPacketReceived(object sender, UdpSocketMessageReceivedEventArgs args)
+        private void PacketRead(byte[] data)
         {
-            while (this.bufferUse + args.ByteData.Length > this.bufferSize)
+            while (this.bufferUse + data.Length > this.bufferSize)
             {
                 byte[] unused;
                 this.multicastPackets.TryDequeue(out unused);
             }
 
-            this.bufferUse += args.ByteData.Length;
-            this.multicastPackets.Enqueue(args.ByteData);
+            this.bufferUse += data.Length;
+            this.multicastPackets.Enqueue(data);
             this.packetQueuedEvent.Set();
         }
     }

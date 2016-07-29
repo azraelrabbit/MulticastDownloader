@@ -54,9 +54,10 @@ namespace MS.MulticastDownloader.Core.Server.IO
             this.listener.ConnectionReceived += this.SocketConnectionRecieved;
         }
 
-        internal async Task<UdpWriter> CreateWriter(int sessionId, IEncoderFactory encoder)
+        internal async Task<UdpWriter<TWriter>> CreateWriter<TWriter>(int sessionId, IEncoderFactory encoder)
+            where TWriter : IUdpMulticast, new()
         {
-            UdpWriter broadcaster = new UdpWriter(this.UriParameters, this.Settings, this.ServerSettings);
+            UdpWriter<TWriter> broadcaster = new UdpWriter<TWriter>(this.UriParameters, this.Settings, this.ServerSettings);
             await broadcaster.StartMulticastServer(sessionId, encoder);
             return broadcaster;
         }

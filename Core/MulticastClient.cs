@@ -20,18 +20,14 @@ namespace MS.MulticastDownloader.Core
     /// <summary>
     /// Represent a multicast client.
     /// </summary>
-    /// <see cref="ITransferReporting"/>
-    /// <see cref="ISequenceReporting"/>
-    /// <see cref="IReceptionReporting"/>
-    public class MulticastClient : IDisposable, ITransferReporting, ISequenceReporting, IReceptionReporting
+    /// <typeparam name="TReader">The type of the UDP reader.</typeparam>
+    /// <see cref="ITransferReporting" />
+    /// <see cref="ISequenceReporting" />
+    /// <see cref="IReceptionReporting" />
+    public class MulticastClient<TReader> : IDisposable, ITransferReporting, ISequenceReporting, IReceptionReporting
+        where TReader : IUdpMulticast, new()
     {
-        internal const int MaxIntervals = 10;
-        internal const int PacketUpdateInterval = 1000;
-        internal const int EncoderSize = 256;
-        internal static readonly TimeSpan ReconnectDelay = TimeSpan.FromSeconds(30);
-        internal static readonly byte[] ResponseId = Encoding.UTF8.GetBytes("client");
-
-        private ILog log = LogManager.GetLogger<MulticastClient>();
+        private ILog log = LogManager.GetLogger<MulticastClient<TReader>>();
         private IEncoderFactory fileEncoder;
         private CancellationToken token;
         private FileHeader[] files = null;
@@ -39,11 +35,11 @@ namespace MS.MulticastDownloader.Core
         private BitVector written;
         private ClientConnection cliConn;
         private ChunkWriter writer;
-        private UdpReader udpReader;
+        private UdpReader<TReader> udpReader;
         private BoxedLong seqNum;
         private BoxedLong waveNum;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
-        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MaxIntervals);
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
         private BoxedLong bytesPerSecond;
         private Task writeTask = null;
         private int state;
@@ -52,7 +48,7 @@ namespace MS.MulticastDownloader.Core
         private bool complete = false;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
+        /// Initializes a new instance of the <see cref="MulticastClient{TReader}"/> class.
         /// </summary>
         /// <param name="path">The path.</param>
         /// <param name="settings">The settings.</param>
@@ -63,7 +59,7 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
+        /// Initializes a new instance of the <see cref="MulticastClient{TReader}"/> class.
         /// </summary>
         /// <param name="path">The path.</param>
         /// <param name="settings">The settings.</param>
@@ -113,7 +109,7 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
-        /// Gets a value indicating whether this <see cref="MulticastClient"/> is complete.
+        /// Gets a value indicating whether this <see cref="MulticastClient{TReader}"/> is complete.
         /// </summary>
         /// <value>
         ///   <c>true</c> if complete; otherwise, <c>false</c>.
@@ -295,7 +291,7 @@ namespace MS.MulticastDownloader.Core
                     {
                         this.log.Info("Reconnecting. Attempt " + attempt);
                         this.DisposeInternal();
-                        await Task.Delay(ReconnectDelay, this.token);
+                        await Task.Delay(Constants.ReconnectDelay, this.token);
                     }
 
                     try
@@ -391,9 +387,9 @@ namespace MS.MulticastDownloader.Core
                 ChallengeResponse challengeResponse = new ChallengeResponse();
                 if (psk != null)
                 {
-                    this.fileEncoder = new HashEncoderFactory(psk, EncoderSize);
+                    this.fileEncoder = new HashEncoderFactory(psk, Constants.EncoderSize);
                     IEncoder encoder = this.fileEncoder.CreateEncoder();
-                    challengeResponse.ChallengeKey = encoder.Encode(ResponseId);
+                    challengeResponse.ChallengeKey = encoder.Encode(Constants.ResponseId);
                 }
 
                 await this.cliConn.Send(challengeResponse, this.token);
@@ -450,7 +446,7 @@ namespace MS.MulticastDownloader.Core
         {
             try
             {
-                this.udpReader = await this.cliConn.JoinMulticastServer(response, this.fileEncoder);
+                this.udpReader = await this.cliConn.JoinMulticastServer<TReader>(response, this.fileEncoder);
                 this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
@@ -524,7 +520,7 @@ namespace MS.MulticastDownloader.Core
                             this.log.Debug("New wave: " + waveResp.WaveNumber);
                         }
 
-                        await Task.Delay(PacketUpdateInterval, this.token);
+                        await Task.Delay(Constants.PacketUpdateInterval, this.token);
                     }
                 }
                 catch (Exception ex)

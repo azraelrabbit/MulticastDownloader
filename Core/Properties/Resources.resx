@@ -144,6 +144,9 @@
   <data name="InvalidEncoder" xml:space="preserve">
     <value>Invalid encoder object.</value>
   </data>
+  <data name="InvalidInterfaceName" xml:space="preserve">
+    <value>Invalid interface name.</value>
+  </data>
   <data name="InvalidKeyFile" xml:space="preserve">
     <value>Invalid key file.</value>
   </data>

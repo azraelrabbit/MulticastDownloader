@@ -143,6 +143,15 @@ namespace MS.MulticastDownloader.Core.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Invalid interface name..
+        /// </summary>
+        internal static string InvalidInterfaceName {
+            get {
+                return ResourceManager.GetString("InvalidInterfaceName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid key file..
         /// </summary>
         internal static string InvalidKeyFile {

@@ -21,13 +21,13 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class UdpWriter : ServerConnectionBase
+    internal class UdpWriter<TWriter> : ServerConnectionBase
+        where TWriter : IUdpMulticast, new()
     {
-        private ILog log = LogManager.GetLogger<ServerListener>();
+        private ILog log = LogManager.GetLogger<UdpWriter<TWriter>>();
         private IEncoderFactory encoder;
-        private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
+        private TWriter multicastClient = new TWriter();
         private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
-        private bool udpListen;
         private bool disposed;
 
         internal UdpWriter(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
@@ -59,14 +59,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
             private set;
         }
 
-        internal UdpSocketMulticastClient MulticastClient
-        {
-            get
-            {
-                return this.multicastClient;
-            }
-        }
-
         internal async Task StartMulticastServer(int sessionId, IEncoderFactory encoderFactory)
         {
             Contract.Requires(sessionId >= 0 && sessionId < this.ServerSettings.MaxSessions);
@@ -88,7 +80,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 this.BlockSize = unencodedSize;
             }
 
-            this.udpListen = true;
             ICommsInterface commsInterface = await this.GetCommsInterface();
             this.log.DebugFormat("Initializing multicast session on {0}:{1}, if={2}", this.MulticastAddress, this.MulticastPort, commsInterface != null ? commsInterface.Name : string.Empty);
             if (commsInterface != null)
@@ -100,16 +91,13 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 }
             }
 
-            await this.multicastClient.JoinMulticastGroupAsync(this.MulticastAddress, this.MulticastPort, commsInterface);
+            await this.multicastClient.Connect(commsInterface.Name, this.MulticastAddress, this.MulticastPort, this.Settings.Ttl);
         }
 
         internal override async Task Close()
         {
             await base.Close();
-            if (this.udpListen)
-            {
-                await this.multicastClient.DisconnectAsync();
-            }
+            await this.multicastClient.Close();
         }
 
         internal async Task SendMulticast<T>(IEnumerable<T> data, CancellationToken token)
@@ -138,7 +126,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
                         this.encoders.Add(encoder);
                     }
 
-                    await this.multicastClient.SendMulticastAsync(serialized);
+                    await this.multicastClient.Send(serialized);
                 });
             });
 

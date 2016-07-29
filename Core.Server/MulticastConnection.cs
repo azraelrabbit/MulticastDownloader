@@ -15,6 +15,7 @@ namespace MS.MulticastDownloader.Core.Server
     using System.Threading.Tasks;
     using Common.Logging;
     using Core.Cryptography;
+    using Core.IO;
     using Cryptography;
     using IO;
     using Properties;
@@ -23,19 +24,21 @@ namespace MS.MulticastDownloader.Core.Server
     /// <summary>
     /// Represent an initial multicast connection.
     /// </summary>
+    /// <typeparam name="TWriter">The type of the UDP writer.</typeparam>
     /// <seealso cref="ITransferReporting" />
     /// <seealso cref="ISequenceReporting"/>
     /// <seealso cref="IReceptionReporting"/>
     /// <seealso cref="ServerBase" />
-    public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>, ITransferReporting, ISequenceReporting, IReceptionReporting
+    public class MulticastConnection<TWriter> : ServerBase, IEquatable<MulticastConnection<TWriter>>, ITransferReporting, ISequenceReporting, IReceptionReporting
+            where TWriter : IUdpMulticast, new()
     {
-        private ILog log = LogManager.GetLogger<MulticastConnection>();
+        private ILog log = LogManager.GetLogger<MulticastConnection<TWriter>>();
         private BoxedLong bytesPerSecond;
-        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(MulticastClient.MaxIntervals);
+        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
         private BitVector written;
         private bool disposed;
 
-        internal MulticastConnection(MulticastServer server, ServerConnection serverConn)
+        internal MulticastConnection(MulticastServer<TWriter> server, ServerConnection serverConn)
         {
             Contract.Requires(server != null && serverConn != null);
             this.Server = server;
@@ -233,13 +236,13 @@ namespace MS.MulticastDownloader.Core.Server
         /// <value>
         /// The multicast session this connection belongs to.
         /// </value>
-        public MulticastSession Session
+        public MulticastSession<TWriter> Session
         {
             get;
             private set;
         }
 
-        internal MulticastServer Server
+        internal MulticastServer<TWriter> Server
         {
             get;
             private set;
@@ -278,9 +281,9 @@ namespace MS.MulticastDownloader.Core.Server
         /// </returns>
         public override bool Equals(object obj)
         {
-            if (obj is MulticastConnection)
+            if (obj is MulticastConnection<TWriter>)
             {
-                return this.Equals(obj as MulticastConnection);
+                return this.Equals(obj as MulticastConnection<TWriter>);
             }
 
             return base.Equals(obj);
@@ -293,7 +296,7 @@ namespace MS.MulticastDownloader.Core.Server
         /// <returns>
         /// true if the current object is equal to the <paramref name="other" /> parameter; otherwise, false.
         /// </returns>
-        public bool Equals(MulticastConnection other)
+        public bool Equals(MulticastConnection<TWriter> other)
         {
             if (other != null && this != other)
             {
@@ -361,7 +364,7 @@ namespace MS.MulticastDownloader.Core.Server
                 this.log.Debug("Authenticating challenge");
                 IDecoder decoder = this.Server.EncoderFactory.CreateDecoder();
                 byte[] responsePhrase = decoder.Decode(challengeResponse.ChallengeKey);
-                if (!responsePhrase.SequenceEqual(MulticastClient.ResponseId))
+                if (!responsePhrase.SequenceEqual(Constants.ResponseId))
                 {
                     authResponse.ResponseType = ResponseId.AccessDenied;
                     authResponse.Message = Resources.AuthenticationFailed;
@@ -378,7 +381,7 @@ namespace MS.MulticastDownloader.Core.Server
             return request.Path;
         }
 
-        internal async Task JoinSession(MulticastSession session, CancellationToken timeoutToken)
+        internal async Task JoinSession(MulticastSession<TWriter> session, CancellationToken timeoutToken)
         {
             DateTime now = DateTime.Now;
             this.throughputCalculator.Start(session.TotalBytes, now);

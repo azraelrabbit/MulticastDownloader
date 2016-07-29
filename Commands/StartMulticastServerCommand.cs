@@ -15,6 +15,7 @@ namespace MS.MulticastDownloader.Commands
     using Common.Logging.Simple;
     using Core;
     using Core.Cryptography;
+    using Core.IO;
     using Core.Server;
     using PCLStorage;
     using Properties;
@@ -24,7 +25,7 @@ namespace MS.MulticastDownloader.Commands
     /// <para type="description">This starts a multicast server using the specified parameters. This call will block until the user interrupts it.</para>
     /// </summary>
     /// <seealso cref="Cmdlet" />
-    /// <seealso cref="MulticastServer" />
+    /// <seealso cref="MulticastServer{TWriter}" />
     [Cmdlet(VerbsLifecycle.Start, "MulticastServer")]
     public class StartMulticastServerCommand : MulticastCmdlet, IMulticastSettings, IMulticastServerSettings
     {
@@ -342,7 +343,7 @@ namespace MS.MulticastDownloader.Commands
                 this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
             }
 
-            using (MulticastServer server = new MulticastServer(this.Uri, this, this))
+            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(this.Uri, this, this))
             {
                 Task hostTask = server.Listen(this.Token);
                 while (!hostTask.IsCompleted && !hostTask.IsCanceled && !hostTask.IsFaulted)
@@ -350,7 +351,7 @@ namespace MS.MulticastDownloader.Commands
                     await Task.Delay(this.UpdateInterval, this.Token);
                     this.WriteTransferProgress(0, server);
                     this.WriteTransferReception(0, server);
-                    foreach (MulticastSession session in server.Sessions)
+                    foreach (MulticastSession<PortableUdpMulticast> session in server.Sessions)
                     {
                         this.WriteTransferProgress(1 + session.SessionId, session);
                     }
@@ -358,7 +359,7 @@ namespace MS.MulticastDownloader.Commands
 
                 this.WriteTransferProgressComplete(0, server);
                 this.WriteTransferReceptionComplete(0, server);
-                foreach (MulticastSession session in server.Sessions)
+                foreach (MulticastSession<PortableUdpMulticast> session in server.Sessions)
                 {
                     this.WriteTransferProgressComplete(1 + session.SessionId, session);
                 }

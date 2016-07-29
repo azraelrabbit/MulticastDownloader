@@ -54,6 +54,7 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Constants.cs" />
     <Compile Include="Cryptography\AsymmetricEncoderFactory.cs" />
     <Compile Include="Cryptography\AsymmetricSecretFlags.cs" />
     <Compile Include="Cryptography\BufferedCipherBaseExtensions.cs" />
@@ -72,6 +73,8 @@
     <Compile Include="IO\ChunkBase.cs" />
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
+    <Compile Include="IO\IUdpMulticast.cs" />
+    <Compile Include="IO\PortableUdpMulticast.cs" />
     <Compile Include="IO\UdpReader.cs" />
     <Compile Include="IO\ConnectionBase.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />

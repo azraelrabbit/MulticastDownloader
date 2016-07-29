@@ -84,7 +84,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 Assert.Equal(settings, listener.Settings);
                 Assert.Equal(serverSettings, listener.ServerSettings);
                 await listener.Listen();
-                using (UdpWriter writer = await listener.CreateWriter(0, settings.Encoder))
+                using (UdpWriter<PortableUdpMulticast> writer = await listener.CreateWriter<PortableUdpMulticast>(0, settings.Encoder))
                 {
                     Assert.InRange(writer.BlockSize, 1, serverSettings.Mtu);
                     Assert.Equal(uriParams, writer.UriParameters);
