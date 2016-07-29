@@ -333,6 +333,10 @@ namespace MS.MulticastDownloader.Core.Server
                 throw new InvalidOperationException(Resources.TooManyConnections);
             }
 
+            Response connectResponse = new Response();
+            connectResponse.ResponseType = ResponseId.Ok;
+            await this.ServerConnection.Send(connectResponse, token);
+
             Challenge challenge = new Challenge();
             if (this.Server.Settings.Encoder != null)
             {
@@ -344,7 +348,9 @@ namespace MS.MulticastDownloader.Core.Server
             if (this.Server.Parameters.UseTls)
             {
                 // We use TLS to secure the connection before sending back the decoded response.
-                this.ServerConnection.AcceptTls(this.Server.ChallengeKey);
+                byte[] psk = new byte[this.Server.ChallengeKey.Length];
+                Array.Copy(this.Server.ChallengeKey, psk, this.Server.ChallengeKey.Length);
+                this.ServerConnection.AcceptTls(psk);
             }
 
             ChallengeResponse challengeResponse = await this.ServerConnection.Receive<ChallengeResponse>(token);
@@ -367,7 +373,7 @@ namespace MS.MulticastDownloader.Core.Server
             this.log.Info("Connection from " + this + " accepted.");
 
             SessionJoinRequest request = await this.ServerConnection.Receive<SessionJoinRequest>(token);
-            this.log.InfoFormat("Payload '{0}' requested with state: {1}", request.Path, request.State);
+            this.log.InfoFormat("Payload '{0}' requested with state: {1}", request.Path ?? "<null>", request.State);
             this.State = request.State;
             return request.Path;
         }

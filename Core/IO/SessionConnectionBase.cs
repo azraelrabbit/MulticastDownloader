@@ -75,37 +75,27 @@ namespace MS.MulticastDownloader.Core.IO
         internal async Task Send<T>(T data, CancellationToken token)
             where T : class
         {
-            Contract.Assert(!this.UriParameters.UseTls || this.outStream != this.TcpSession.WriteStream);
-            if (!this.UriParameters.UseTls || this.outStream != this.TcpSession.WriteStream)
+            Contract.Requires(this.TcpSession != null);
+            Contract.Requires(data != null);
+            Task<bool> t0 = Task.Run(() =>
             {
-                Contract.Requires(this.TcpSession != null);
-                Contract.Requires(data != null);
-                Task<bool> t0 = Task.Run(() =>
-                {
-                    Serializer.SerializeWithLengthPrefix(this.outStream, data, PrefixStyle.Fixed32);
-                    return true;
-                });
+                Serializer.SerializeWithLengthPrefix(this.outStream, data, PrefixStyle.Fixed32);
+                return true;
+            });
 
-                await t0.WaitWithCancellation(token);
-            }
+            await t0.WaitWithCancellation(token);
         }
 
         internal async Task<T> Receive<T>(CancellationToken token)
             where T : class
         {
-            Contract.Assert(!this.UriParameters.UseTls || this.inStream != this.TcpSession.ReadStream);
-            if (!this.UriParameters.UseTls || this.inStream != this.TcpSession.ReadStream)
+            Contract.Requires(this.TcpSession != null);
+            Task<T> t0 = Task.Run(() =>
             {
-                Contract.Requires(this.TcpSession != null);
-                Task<T> t0 = Task.Run(() =>
-                {
-                    return Serializer.DeserializeWithLengthPrefix<T>(this.inStream, PrefixStyle.Fixed32);
-                });
+                return Serializer.DeserializeWithLengthPrefix<T>(this.inStream, PrefixStyle.Fixed32);
+            });
 
-                return await t0.WaitWithCancellation(token);
-            }
-
-            return default(T);
+            return await t0.WaitWithCancellation(token);
         }
 
         internal void SetTcpSession(ITcpSocketClient client)

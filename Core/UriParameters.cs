@@ -76,7 +76,16 @@ namespace MS.MulticastDownloader.Core
                 this.Port = DefaultPort;
             }
 
-            this.Path = uri.AbsolutePath;
+            this.Path = uri.LocalPath;
+            while (this.Path.StartsWith("/") || this.Path.StartsWith("\\"))
+            {
+                this.Path = this.Path.Remove(0, 1);
+            }
+
+            if (string.IsNullOrEmpty(this.Path))
+            {
+                this.Path = ".";
+            }
         }
 
         /// <summary>

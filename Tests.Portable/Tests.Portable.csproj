@@ -48,6 +48,7 @@
     <!-- A reference to the entire .NET Framework is automatically included -->
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ClientServerTest.cs" />
     <Compile Include="Cryptography\EncoderTest.cs" />
     <Compile Include="IO\ChunkTest.cs" />
     <Compile Include="IO\SessionTest.cs" />

@@ -13,6 +13,7 @@ namespace MS.MulticastDownloader.Core
     using Common.Logging;
     using Cryptography;
     using IO;
+    using PCLStorage;
     using Properties;
     using Session;
 
@@ -303,16 +304,14 @@ namespace MS.MulticastDownloader.Core
 
                         // Connect to the server, authenticate and receive the multicast payload.
                         await this.ConnectToServer();
-                        await this.RequestFilesAndBeginReading();
+                        SessionJoinResponse response = await this.RequestFilesAndBeginReading();
                         this.canReconnect = true;
 
                         // Now begin processing received packets and transmitting them back to the service.
-                        await this.MulticastDownload();
+                        await this.MulticastDownload(response);
 
                         await this.writer.Flush();
                         this.log.Info("Transfer complete");
-                        await this.cliConn.Close();
-                        await this.udpReader.Close();
                     }
                     catch (Exception ex)
                     {
@@ -329,9 +328,30 @@ namespace MS.MulticastDownloader.Core
                         }
 
                         this.log.Error(ex);
+                        if (this.canReconnect)
+                        {
+                            await this.Close();
+                        }
                     }
                 }
             });
+        }
+
+        /// <summary>
+        /// Closes this client and any connections associated with it.
+        /// </summary>
+        /// <returns>A task object</returns>
+        public async Task Close()
+        {
+            if (this.udpReader != null)
+            {
+                await this.udpReader.Close();
+            }
+
+            if (this.cliConn != null)
+            {
+                await this.cliConn.Close();
+            }
         }
 
         /// <summary>
@@ -342,50 +362,15 @@ namespace MS.MulticastDownloader.Core
             this.Dispose(true);
         }
 
-        /// <summary>
-        /// Releases unmanaged and - optionally - managed resources.
-        /// </summary>
-        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!this.disposedValue)
-            {
-                this.disposedValue = true;
-                if (disposing)
-                {
-                    this.DisposeInternal();
-                }
-
-                this.written = null;
-                this.writer = null;
-            }
-        }
-
-        private void DisposeInternal()
-        {
-            if (this.cliConn != null)
-            {
-                this.cliConn.Dispose();
-            }
-
-            if (this.udpReader != null)
-            {
-                this.udpReader.Dispose();
-            }
-
-            if (this.fileSet != null)
-            {
-                this.fileSet.Dispose();
-            }
-        }
-
-        private async Task ConnectToServer()
+        internal async Task ConnectToServer()
         {
             try
             {
                 this.log.Info("Connecting to server: " + this.Parameters);
                 this.cliConn = new ClientConnection(this.Parameters, this.Settings);
                 await this.cliConn.Connect();
+                Response connectResponse = await this.cliConn.Receive<Response>(this.token);
+                connectResponse.ThrowIfFailed();
 
                 Challenge challenge = await this.cliConn.Receive<Challenge>(this.token);
                 byte[] psk = null;
@@ -395,7 +380,7 @@ namespace MS.MulticastDownloader.Core
                     psk = decoder.Decode(challenge.ChallengeKey);
                 }
 
-                this.log.Debug("Challenge: " + Convert.ToBase64String(challenge.ChallengeKey));
+                this.log.Debug("Challenge: " + ((challenge.ChallengeKey != null) ? Convert.ToBase64String(challenge.ChallengeKey) : "<null>"));
                 if (this.Parameters.UseTls)
                 {
                     // We use TLS to secure the connection before sending back the decoded response.
@@ -403,19 +388,15 @@ namespace MS.MulticastDownloader.Core
                 }
 
                 // We'll use the file encoder on the PSK to decode file data.
-                ChallengeResponse response = new ChallengeResponse();
+                ChallengeResponse challengeResponse = new ChallengeResponse();
                 if (psk != null)
                 {
                     this.fileEncoder = new HashEncoderFactory(psk, EncoderSize);
                     IEncoder encoder = this.fileEncoder.CreateEncoder();
-                    response.ChallengeKey = encoder.Encode(ResponseId);
-                }
-                else
-                {
-                    response.ChallengeKey = ResponseId;
+                    challengeResponse.ChallengeKey = encoder.Encode(ResponseId);
                 }
 
-                await this.cliConn.Send(response, this.token);
+                await this.cliConn.Send(challengeResponse, this.token);
 
                 Response authResponse = await this.CheckResponse<Response>();
                 this.log.Debug("Auth response: " + authResponse);
@@ -426,7 +407,7 @@ namespace MS.MulticastDownloader.Core
             }
         }
 
-        private async Task RequestFilesAndBeginReading()
+        internal async Task<SessionJoinResponse> RequestFilesAndBeginReading()
         {
             try
             {
@@ -457,7 +438,7 @@ namespace MS.MulticastDownloader.Core
                 this.log.DebugFormat("Listening on {0}:{1}", response.MulticastAddress, response.MulticastPort);
                 this.waveNum = new BoxedLong(response.WaveNumber);
                 this.log.Debug("Starting wave: " + response.WaveNumber);
-                this.udpReader = await this.cliConn.JoinMulticastServer(response, this.fileEncoder);
+                return response;
             }
             catch (Exception ex)
             {
@@ -465,10 +446,11 @@ namespace MS.MulticastDownloader.Core
             }
         }
 
-        private async Task MulticastDownload()
+        internal async Task MulticastDownload(SessionJoinResponse response)
         {
             try
             {
+                this.udpReader = await this.cliConn.JoinMulticastServer(response, this.fileEncoder);
                 this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
@@ -506,7 +488,7 @@ namespace MS.MulticastDownloader.Core
         }
 
         // Returns true if the wave completed
-        private Task UpdateStatus()
+        internal Task UpdateStatus()
         {
             return Task.Run(async () =>
             {
@@ -550,6 +532,43 @@ namespace MS.MulticastDownloader.Core
                     throw new SessionAbortedException(Resources.StatusUpdateFailed, ex);
                 }
             });
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!this.disposedValue)
+            {
+                this.disposedValue = true;
+                if (disposing)
+                {
+                    this.DisposeInternal();
+                }
+
+                this.written = null;
+                this.writer = null;
+            }
+        }
+
+        private void DisposeInternal()
+        {
+            if (this.cliConn != null)
+            {
+                this.cliConn.Dispose();
+            }
+
+            if (this.udpReader != null)
+            {
+                this.udpReader.Dispose();
+            }
+
+            if (this.fileSet != null)
+            {
+                this.fileSet.Dispose();
+            }
         }
 
         private async Task<bool> TryCleanFiles()

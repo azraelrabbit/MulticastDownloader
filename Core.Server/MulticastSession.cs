@@ -96,8 +96,13 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                return this.fileSet.FileHeaders.Select((h) => h.Name)
-                                               .ToList();
+                if (this.fileSet != null)
+                {
+                    return this.fileSet.FileHeaders.Select((h) => h.Name)
+                                                   .ToList();
+                }
+
+                return new string[0];
             }
         }
 
@@ -362,7 +367,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             this.waveNum = new BoxedLong(1);
-            this.fileSet = new FileSet(rootFolder, this.Files);
+            this.fileSet = new FileSet(rootFolder, filePaths);
             await this.fileSet.InitRead(this.writer.BlockSize);
             this.written = new BitVector(this.fileSet.NumSegments);
         }
@@ -429,6 +434,25 @@ namespace MS.MulticastDownloader.Core.Server
             this.log.Debug("Wave complete");
         }
 
+        internal async Task UpdateStatus(long seq, CancellationToken token)
+        {
+            Task delayTask = Task.Delay(MulticastClient.PacketUpdateInterval, token);
+            long bytesRemaining = this.BytesRemaining;
+            for (long i = 0; i < seq; ++i)
+            {
+                if (!this.reader.Read[seq])
+                {
+                    bytesRemaining -= this.reader.Chunks[seq].Block.Length;
+                    Contract.Assert(bytesRemaining >= 0);
+                }
+            }
+
+            long average = this.throughputCalculator.UpdateThroughput(bytesRemaining, DateTime.Now);
+            this.seqNum = new BoxedLong(seq);
+            this.bytesPerSecond = new BoxedLong(average);
+            await delayTask;
+        }
+
         internal async Task Close()
         {
             this.log.Debug("Closing session: " + this);
@@ -469,25 +493,6 @@ namespace MS.MulticastDownloader.Core.Server
             catch (OperationCanceledException)
             {
             }
-        }
-
-        private async Task UpdateStatus(long seq, CancellationToken token)
-        {
-            Task delayTask = Task.Delay(MulticastClient.PacketUpdateInterval, token);
-            long bytesRemaining = this.BytesRemaining;
-            for (long i = 0; i < seq; ++i)
-            {
-                if (!this.reader.Read[seq])
-                {
-                    bytesRemaining -= this.reader.Chunks[seq].Block.Length;
-                    Contract.Assert(bytesRemaining >= 0);
-                }
-            }
-
-            long average = this.throughputCalculator.UpdateThroughput(bytesRemaining, DateTime.Now);
-            this.seqNum = new BoxedLong(seq);
-            this.bytesPerSecond = new BoxedLong(average);
-            await delayTask;
         }
     }
 }

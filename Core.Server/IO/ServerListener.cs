@@ -121,28 +121,11 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
         private void SocketConnectionRecieved(object sender, TcpSocketListenerConnectEventArgs eventArgs)
         {
-            while (this.connections.Count >= this.ServerSettings.MaxConnections)
-            {
-                ServerConnection conn;
-                if (this.connections.TryDequeue(out conn))
-                {
-                    conn.Dispose();
-                }
-            }
-
-            try
-            {
-                ITcpSocketClient client = eventArgs.SocketClient;
-                ServerConnection conn = new ServerConnection(this.UriParameters, this.Settings);
-                conn.SetTcpSession(client);
-                this.clientConnectedEvent.Set();
-                this.connections.Enqueue(conn);
-            }
-            catch (GeneralSecurityException gse)
-            {
-                this.log.Error("Authentication failed");
-                this.log.Error(gse);
-            }
+            ITcpSocketClient client = eventArgs.SocketClient;
+            ServerConnection conn = new ServerConnection(this.UriParameters, this.Settings);
+            conn.SetTcpSession(client);
+            this.clientConnectedEvent.Set();
+            this.connections.Enqueue(conn);
         }
     }
 }

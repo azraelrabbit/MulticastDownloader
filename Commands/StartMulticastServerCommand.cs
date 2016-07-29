@@ -363,7 +363,15 @@ namespace MS.MulticastDownloader.Commands
                     this.WriteTransferProgressComplete(1 + session.SessionId, session);
                 }
 
-                await hostTask;
+                try
+                {
+                    await hostTask;
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                await server.Close();
             }
 
             timerRet = NativeMethods.timeEndPeriod(1);

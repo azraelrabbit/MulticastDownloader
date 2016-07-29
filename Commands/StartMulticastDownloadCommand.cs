@@ -199,6 +199,7 @@ namespace MS.MulticastDownloader.Commands
                 }
 
                 await transferTask;
+                await client.Close();
             }
         }
     }

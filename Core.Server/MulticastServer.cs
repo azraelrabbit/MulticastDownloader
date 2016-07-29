@@ -51,6 +51,7 @@ namespace MS.MulticastDownloader.Core.Server
         private HashEncoderFactory encoderFactory;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
         private CancellationToken token = CancellationToken.None;
+        private Task acceptTask;
         private bool listening;
         private bool disposed;
 
@@ -85,10 +86,13 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             this.listener = new ServerListener(this.Parameters, settings, serverSettings);
-            SecureRandom sr = new SecureRandom();
-            this.ChallengeKey = new byte[MulticastClient.EncoderSize / 8];
-            sr.NextBytes(this.ChallengeKey);
-            this.encoderFactory = new HashEncoderFactory(this.ChallengeKey, MulticastClient.EncoderSize);
+            if (settings.Encoder != null)
+            {
+                SecureRandom sr = new SecureRandom();
+                this.ChallengeKey = new byte[MulticastClient.EncoderSize / 8];
+                sr.NextBytes(this.ChallengeKey);
+                this.encoderFactory = new HashEncoderFactory(this.ChallengeKey, MulticastClient.EncoderSize);
+            }
         }
 
         /// <summary>
@@ -281,9 +285,7 @@ namespace MS.MulticastDownloader.Core.Server
                 this.log.Info("Starting multicast server");
                 try
                 {
-                    await this.listener.Listen();
-                    Task acceptTask = this.AcceptAndJoinClients();
-                    this.listening = true;
+                    this.acceptTask = this.AcceptAndJoinClients(token);
                     using (CancellationTokenRegistration registration = this.token.Register(this.CancelListen))
                     {
                         while (this.listening)
@@ -313,9 +315,6 @@ namespace MS.MulticastDownloader.Core.Server
                             }
                         }
                     }
-
-                    await acceptTask;
-                    await this.listener.Close();
                 }
                 catch (Exception ex)
                 {
@@ -335,45 +334,28 @@ namespace MS.MulticastDownloader.Core.Server
         }
 
         /// <summary>
-        /// Releases unmanaged and - optionally - managed resources.
+        /// Closes this instance and any connections associated with it.
         /// </summary>
-        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
-        protected override void Dispose(bool disposing)
+        /// <returns>A task object.</returns>
+        public async Task Close()
         {
-            base.Dispose(disposing);
-            if (!this.disposed)
+            await this.listener.Close();
+            foreach (MulticastConnection conn in this.Connections)
             {
-                this.disposed = true;
-                if (disposing)
-                {
-                    foreach (MulticastSession session in this.sessions)
-                    {
-                        session.Dispose();
-                    }
+                await conn.Close();
+            }
 
-                    foreach (MulticastConnection connection in this.connections)
-                    {
-                        connection.Dispose();
-                    }
-
-                    if (this.listener != null)
-                    {
-                        this.listener.Dispose();
-                    }
-
-                    if (this.joinEvent != null)
-                    {
-                        this.joinEvent.Dispose();
-                    }
-                }
-
-                this.sessions = null;
-                this.connections = null;
+            if (this.acceptTask != null)
+            {
+                await this.acceptTask;
             }
         }
 
-        private async Task AcceptAndJoinClients()
+        internal async Task AcceptAndJoinClients(CancellationToken token)
         {
+            this.token = token;
+            this.listening = true;
+            await this.listener.Listen();
             while (this.listening)
             {
                 ICollection<ServerConnection> conns = await this.listener.ReceiveConnections(this.token);
@@ -419,7 +401,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        private async Task<ICollection<MulticastConnection>> CleanupConnections()
+        internal async Task<ICollection<MulticastConnection>> CleanupConnections()
         {
             ICollection<MulticastConnection> connections = this.Connections;
             List<MulticastConnection> newConns = new List<MulticastConnection>(connections.Count);
@@ -441,7 +423,7 @@ namespace MS.MulticastDownloader.Core.Server
             return newConns;
         }
 
-        private ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection> connections)
+        internal ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection> connections)
         {
             HashSet<MulticastSession> activeSessions = new HashSet<MulticastSession>();
             foreach (MulticastConnection conn in connections)
@@ -479,7 +461,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        private async Task WaveUpdate()
+        internal async Task WaveUpdate()
         {
             await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>((wsu, mc, token) =>
             {
@@ -492,7 +474,7 @@ namespace MS.MulticastDownloader.Core.Server
             });
         }
 
-        private async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
+        internal async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
         {
             using (CancellationTokenSource statusCts = new CancellationTokenSource())
             using (CancellationTokenRegistration statusCancellationTokenCanceller = statusCts.Token.Register(() => statusCts.Cancel()))
@@ -510,7 +492,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        private async Task ProcessStatusUpdates(ICollection<MulticastConnection> connections, CancellationToken updateToken)
+        internal async Task ProcessStatusUpdates(ICollection<MulticastConnection> connections, CancellationToken updateToken)
         {
             bool waveComplete = false;
             using (CancellationTokenRegistration registration = updateToken.Register(() => waveComplete = true))
@@ -535,6 +517,150 @@ namespace MS.MulticastDownloader.Core.Server
 
                     this.UpdateBurstDelay(connections);
                 }
+            }
+        }
+
+        internal void UpdateBurstDelay(ICollection<MulticastConnection> connections)
+        {
+            SortedSet<double> receptionRates = new SortedSet<double>();
+            foreach (MulticastConnection conn in connections)
+            {
+                this.log.Trace(conn + " bps: " + conn.BytesPerSecond + ", rr: " + conn.ReceptionRate);
+                receptionRates.Add(conn.ReceptionRate);
+            }
+
+            double receptionRate;
+            switch (this.ServerSettings.DelayCalculation)
+            {
+                case DelayCalculation.MinimumThroughput:
+                    receptionRate = receptionRates.Min;
+                    break;
+                case DelayCalculation.MaximumThroughput:
+                    receptionRate = receptionRates.Max;
+                    break;
+                case DelayCalculation.AverageThroughput:
+                    receptionRate = receptionRates.Average();
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+
+            this.receptionRate = new BoxedDouble(receptionRate);
+            int burstDelay = this.BurstDelayMs;
+            if (receptionRate < IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
+            {
+                ++burstDelay;
+            }
+            else if (receptionRate > DecreaseThreshold)
+            {
+                --burstDelay;
+            }
+
+            if (burstDelay < MinBurstDelay)
+            {
+                burstDelay = MinBurstDelay;
+            }
+            else if (burstDelay > MaxBurstDelay)
+            {
+                burstDelay = MaxBurstDelay;
+            }
+
+            this.BurstDelayMs = burstDelay;
+            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay);
+        }
+
+        internal async Task<MulticastSession> GetSession(string path)
+        {
+            IFolder rootFolder = this.Settings.RootFolder;
+            ExistenceCheckResult pathExists = await rootFolder.CheckExistsAsync(path);
+            string key;
+            if (pathExists == ExistenceCheckResult.FileExists)
+            {
+                key = (await rootFolder.GetFileAsync(path)).Path;
+            }
+            else if (pathExists == ExistenceCheckResult.FolderExists)
+            {
+                key = (await rootFolder.GetFolderAsync(path)).Path;
+            }
+            else
+            {
+                throw new FileNotFoundException();
+            }
+
+            HashSet<int> usedSessions = new HashSet<int>();
+            foreach (MulticastSession session in this.Sessions)
+            {
+                if (session.Path == key)
+                {
+                    return session;
+                }
+
+                usedSessions.Add(session.SessionId);
+            }
+
+            if (usedSessions.Count >= this.ServerSettings.MaxSessions)
+            {
+                throw new InvalidOperationException(Resources.TooManySessions);
+            }
+
+            for (int i = 0; i < this.ServerSettings.MaxSessions; ++i)
+            {
+                if (!usedSessions.Contains(i))
+                {
+                    MulticastSession newSession = new MulticastSession(this, key, i);
+                    UdpWriter writer = await this.listener.CreateWriter(i, this.encoderFactory);
+                    await newSession.StartSession(writer, this.token);
+                    lock (this.sessionLock)
+                    {
+                        this.sessions.Add(newSession);
+                        return newSession;
+                    }
+                }
+            }
+
+            throw new InvalidOperationException();
+        }
+
+        /// <summary>
+        /// Releases unmanaged and - optionally - managed resources.
+        /// </summary>
+        /// <param name="disposing"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
+        protected override void Dispose(bool disposing)
+        {
+            base.Dispose(disposing);
+            if (!this.disposed)
+            {
+                this.disposed = true;
+                if (disposing)
+                {
+                    foreach (MulticastSession session in this.sessions)
+                    {
+                        session.Dispose();
+                    }
+
+                    this.sessions.Clear();
+
+                    foreach (MulticastConnection connection in this.connections)
+                    {
+                        connection.Dispose();
+                    }
+
+                    this.connections.Clear();
+
+                    if (this.listener != null)
+                    {
+                        this.listener.Dispose();
+                        this.listener = null;
+                    }
+
+                    if (this.joinEvent != null)
+                    {
+                        this.joinEvent.Dispose();
+                    }
+                }
+
+                this.sessions = null;
+                this.connections = null;
             }
         }
 
@@ -590,111 +716,10 @@ namespace MS.MulticastDownloader.Core.Server
             });
         }
 
-        private void UpdateBurstDelay(ICollection<MulticastConnection> connections)
-        {
-            SortedSet<double> receptionRates = new SortedSet<double>();
-            foreach (MulticastConnection conn in connections)
-            {
-                this.log.Trace(conn + " bps: " + conn.BytesPerSecond + ", rr: " + conn.ReceptionRate);
-                receptionRates.Add(conn.ReceptionRate);
-            }
-
-            double receptionRate;
-            switch (this.ServerSettings.DelayCalculation)
-            {
-                case DelayCalculation.MinimumThroughput:
-                    receptionRate = receptionRates.Min;
-                    break;
-                case DelayCalculation.MaximumThroughput:
-                    receptionRate = receptionRates.Max;
-                    break;
-                case DelayCalculation.AverageThroughput:
-                    receptionRate = receptionRates.Average();
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
-
-            this.receptionRate = new BoxedDouble(receptionRate);
-            int burstDelay = this.BurstDelayMs;
-            if (receptionRate < IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
-            {
-                ++burstDelay;
-            }
-            else if (receptionRate > DecreaseThreshold)
-            {
-                --burstDelay;
-            }
-
-            if (burstDelay < MinBurstDelay)
-            {
-                burstDelay = MinBurstDelay;
-            }
-            else if (burstDelay > MaxBurstDelay)
-            {
-                burstDelay = MaxBurstDelay;
-            }
-
-            this.BurstDelayMs = burstDelay;
-            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay);
-        }
-
         private void CancelListen()
         {
             this.listening = false;
             this.joinEvent.Set();
-        }
-
-        private async Task<MulticastSession> GetSession(string path)
-        {
-            IFolder rootFolder = this.Settings.RootFolder;
-            ExistenceCheckResult pathExists = await rootFolder.CheckExistsAsync(path);
-            string key;
-            if (pathExists == ExistenceCheckResult.FileExists)
-            {
-                key = (await rootFolder.GetFileAsync(path)).Path;
-            }
-            else if (pathExists == ExistenceCheckResult.FolderExists)
-            {
-                key = (await rootFolder.GetFolderAsync(path)).Path;
-            }
-            else
-            {
-                throw new FileNotFoundException();
-            }
-
-            HashSet<int> usedSessions = new HashSet<int>();
-            foreach (MulticastSession session in this.Sessions)
-            {
-                if (session.Path == key)
-                {
-                    return session;
-                }
-
-                usedSessions.Add(session.SessionId);
-            }
-
-            if (usedSessions.Count >= this.ServerSettings.MaxSessions)
-            {
-                throw new InvalidOperationException(Resources.TooManySessions);
-            }
-
-            for (int i = 0; i < this.ServerSettings.MaxSessions; ++i)
-            {
-                if (!usedSessions.Contains(i))
-                {
-                    MulticastSession newSession = new MulticastSession(this, key, i);
-                    UdpWriter writer = await this.listener.CreateWriter(i, this.encoderFactory);
-                    await newSession.StartSession(writer, this.token);
-                    lock (this.sessionLock)
-                    {
-                        this.sessions.Add(newSession);
-                        return newSession;
-                    }
-                }
-            }
-
-            throw new InvalidOperationException();
         }
     }
 }

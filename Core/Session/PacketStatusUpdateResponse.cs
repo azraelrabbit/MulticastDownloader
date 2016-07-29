@@ -9,7 +9,7 @@ namespace MS.MulticastDownloader.Core.Session
     [ProtoContract]
     internal class PacketStatusUpdateResponse : Response
     {
-        [ProtoMember(1)]
+        [ProtoMember(10)]
         internal double ReceptionRate { get; set; }
     }
 }

@@ -9,9 +9,9 @@ namespace MS.MulticastDownloader.Core.Session
     using ProtoBuf;
 
     [ProtoContract]
-    [ProtoInclude(1, typeof(SessionJoinResponse))]
-    [ProtoInclude(2, typeof(WaveCompleteResponse))]
-    [ProtoInclude(3, typeof(PacketStatusUpdateResponse))]
+    [ProtoInclude(3, typeof(SessionJoinResponse))]
+    [ProtoInclude(4, typeof(WaveCompleteResponse))]
+    [ProtoInclude(5, typeof(PacketStatusUpdateResponse))]
     internal class Response
     {
         [ProtoMember(1)]

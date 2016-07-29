@@ -14,25 +14,25 @@ namespace MS.MulticastDownloader.Core.Session
         private const int Ipv4Overhead = 20;
         private const int UdpOverhead = 8;
 
-        [ProtoMember(1)]
+        [ProtoMember(20)]
         internal string MulticastAddress { get; set; }
 
-        [ProtoMember(2)]
+        [ProtoMember(21)]
         internal int MulticastPort { get; set; }
 
-        [ProtoMember(3)]
+        [ProtoMember(22)]
         internal bool Ipv6 { get; set; }
 
-        [ProtoMember(4)]
+        [ProtoMember(23)]
         internal int Mtu { get; set; }
 
-        [ProtoMember(5)]
+        [ProtoMember(24)]
         internal int MulticastBurstLength { get; set; }
 
-        [ProtoMember(6)]
+        [ProtoMember(25)]
         internal FileHeader[] Files { get; set; }
 
-        [ProtoMember(7)]
+        [ProtoMember(26)]
         internal long WaveNumber { get; set; }
 
         internal long CountSegments

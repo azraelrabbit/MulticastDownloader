@@ -10,7 +10,7 @@ namespace MS.MulticastDownloader.Core.Session
     internal class WaveCompleteResponse : Response
     {
         // The next wave number.
-        [ProtoMember(1)]
+        [ProtoMember(30)]
         internal long WaveNumber { get; set; }
     }
 }
