@@ -53,6 +53,7 @@
     <Compile Include="IO\ChunkTest.cs" />
     <Compile Include="IO\SessionTest.cs" />
     <Compile Include="IO\UdpTest.cs" />
+    <Compile Include="PortableTestUdpMulticast.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SessionTest.cs" />
     <Compile Include="Session\BitVectorTest.cs" />
@@ -61,7 +62,6 @@
     <Compile Include="Session\FileSetTest.cs" />
     <Compile Include="Session\ThroughputCalculatorTest.cs" />
     <Compile Include="TestOutputLoggerFactoryAdapter.cs" />
-    <Compile Include="Util\Runtime.cs" />
   </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="stylecop.json" />

@@ -45,14 +45,21 @@ namespace MS.MulticastDownloader.Tests
 
             protected override void WriteInternal(LogLevel level, object message, Exception exception)
             {
-                if (message != null)
+                try
                 {
-                    this.outputHelper.WriteLine("[" + level.ToString() + "]: " + message);
-                }
+                    if (message != null)
+                    {
+                        this.outputHelper.WriteLine("[" + level.ToString() + "]: " + message);
+                    }
 
-                if (exception != null)
+                    if (exception != null)
+                    {
+                        this.outputHelper.WriteLine(exception.ToString());
+                    }
+                }
+                catch (InvalidOperationException)
                 {
-                    this.outputHelper.WriteLine(exception.ToString());
+                    // XUnit sometimes finishes the test case before we can output anything...
                 }
             }
         }

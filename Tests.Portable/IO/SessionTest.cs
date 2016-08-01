@@ -23,6 +23,7 @@ namespace MS.MulticastDownloader.Tests.IO
     using ProtoBuf;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
+    using Tests;
     using Xunit;
     using Xunit.Abstractions;
 
@@ -83,111 +84,116 @@ namespace MS.MulticastDownloader.Tests.IO
                 Assert.Equal(uriParams, listener.UriParameters);
                 Assert.Equal(settings, listener.Settings);
                 Assert.Equal(serverSettings, listener.ServerSettings);
-                await listener.Listen();
-                using (UdpWriter<PortableUdpMulticast> writer = await listener.CreateWriter<PortableUdpMulticast>(0, settings.Encoder))
+                try
                 {
-                    Assert.InRange(writer.BlockSize, 1, serverSettings.Mtu);
-                    Assert.Equal(uriParams, writer.UriParameters);
-                    Assert.Equal(settings, writer.Settings);
-                    Assert.Equal(serverSettings, writer.ServerSettings);
-                    Assert.NotNull(writer);
-                    await writer.Close();
-                }
-
-                List<ClientConnection> clientConns = new List<ClientConnection>();
-                for (int i = 0; i < serverSettings.MaxConnections; ++i)
-                {
-                    ClientConnection cliConn = new ClientConnection(uriParams, settings);
-                    Assert.Equal(uriParams, cliConn.UriParameters);
-                    Assert.Equal(settings, cliConn.Settings);
-                    await cliConn.Connect();
-                    Assert.NotNull(cliConn.TcpSession);
-                    clientConns.Add(cliConn);
-                }
-
-                List<ServerConnection> serverConns = new List<ServerConnection>();
-                DateTime end = DateTime.Now.AddMinutes(10);
-                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
-                {
-                    await Task.Delay(200);
-                    foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
+                    await listener.Listen();
+                    using (UdpWriter writer = await listener.CreateWriter(new PortableTestUdpMulticast(), 0, settings.Encoder))
                     {
-                        Assert.Equal(uriParams, serverConn.UriParameters);
-                        Assert.Equal(settings, serverConn.Settings);
-                        Assert.NotNull(serverConn.TcpSession);
-                        serverConns.Add(serverConn);
-                    }
-                }
-
-                if (uriParams.UseTls)
-                {
-                    List<Task> tlsTasks = new List<Task>();
-                    foreach (ClientConnection clientConn in clientConns)
-                    {
-                        byte[] secret = CreateSecret(passPhrase);
-                        tlsTasks.Add(Task.Run(() => clientConn.ConnectTls(secret)));
+                        Assert.InRange(writer.BlockSize, 1, serverSettings.Mtu);
+                        Assert.Equal(uriParams, writer.UriParameters);
+                        Assert.Equal(settings, writer.Settings);
+                        Assert.Equal(serverSettings, writer.ServerSettings);
+                        Assert.NotNull(writer);
+                        await writer.Close();
                     }
 
-                    foreach (ServerConnection serverConn in serverConns)
+                    List<ClientConnection> clientConns = new List<ClientConnection>();
+                    for (int i = 0; i < serverSettings.MaxConnections; ++i)
                     {
-                        byte[] secret = CreateSecret(passPhrase);
-                        tlsTasks.Add(Task.Run(() => serverConn.AcceptTls(secret)));
+                        ClientConnection cliConn = new ClientConnection(uriParams, settings);
+                        Assert.Equal(uriParams, cliConn.UriParameters);
+                        Assert.Equal(settings, cliConn.Settings);
+                        await cliConn.Connect();
+                        Assert.NotNull(cliConn.TcpSession);
+                        clientConns.Add(cliConn);
                     }
 
-                    await Task.WhenAll(tlsTasks);
-                }
+                    List<ServerConnection> serverConns = new List<ServerConnection>();
+                    DateTime end = DateTime.Now.AddMinutes(10);
+                    while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
+                    {
+                        await Task.Delay(200);
+                        foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
+                        {
+                            Assert.Equal(uriParams, serverConn.UriParameters);
+                            Assert.Equal(settings, serverConn.Settings);
+                            Assert.NotNull(serverConn.TcpSession);
+                            serverConns.Add(serverConn);
+                        }
+                    }
 
-                List<Task> writeTasks = new List<Task>();
-                for (int i = 0; i < numAttempts; ++i)
+                    if (uriParams.UseTls)
+                    {
+                        List<Task> tlsTasks = new List<Task>();
+                        foreach (ClientConnection clientConn in clientConns)
+                        {
+                            byte[] secret = CreateSecret(passPhrase);
+                            tlsTasks.Add(Task.Run(() => clientConn.ConnectTls(secret)));
+                        }
+
+                        foreach (ServerConnection serverConn in serverConns)
+                        {
+                            byte[] secret = CreateSecret(passPhrase);
+                            tlsTasks.Add(Task.Run(() => serverConn.AcceptTls(secret)));
+                        }
+
+                        await Task.WhenAll(tlsTasks);
+                    }
+
+                    List<Task> writeTasks = new List<Task>();
+                    for (int i = 0; i < numAttempts; ++i)
+                    {
+                        HashSet<int> remaining = new HashSet<int>();
+                        for (int j = 0; j < clientConns.Count; ++j)
+                        {
+                            TestData td = new TestData();
+                            int d = (1 + i) * (1 + j);
+                            td.Data = BitConverter.GetBytes(d);
+                            remaining.Add(d);
+                            writeTasks.Add(clientConns[j].Send(td, CancellationToken.None));
+                        }
+
+                        for (int j = 0; j < clientConns.Count; ++j)
+                        {
+                            TestData td2 = await serverConns[j].Receive<TestData>(CancellationToken.None);
+                            int d = BitConverter.ToInt32(td2.Data, 0);
+                            Assert.True(remaining.Remove(d));
+                        }
+
+                        Assert.Equal(0, remaining.Count);
+                    }
+
+                    await Task.WhenAll(writeTasks);
+                    await CloseConnections(clientConns, serverConns);
+                    for (int i = 0; i < serverSettings.MaxConnections + 1; ++i)
+                    {
+                        ClientConnection cliConn = new ClientConnection(uriParams, settings);
+                        await cliConn.Connect();
+                        clientConns.Add(cliConn);
+                    }
+
+                    end = DateTime.Now.AddMinutes(10);
+                    while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
+                    {
+                        await Task.Delay(200);
+                        foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
+                        {
+                            serverConns.Add(serverConn);
+                        }
+                    }
+
+                    await CloseConnections(clientConns, serverConns);
+                }
+                finally
                 {
-                    HashSet<int> remaining = new HashSet<int>();
-                    for (int j = 0; j < clientConns.Count; ++j)
-                    {
-                        TestData td = new TestData();
-                        int d = (1 + i) * (1 + j);
-                        td.Data = BitConverter.GetBytes(d);
-                        remaining.Add(d);
-                        writeTasks.Add(clientConns[j].Send(td, CancellationToken.None));
-                    }
-
-                    for (int j = 0; j < clientConns.Count; ++j)
-                    {
-                        TestData td2 = await serverConns[j].Receive<TestData>(CancellationToken.None);
-                        int d = BitConverter.ToInt32(td2.Data, 0);
-                        Assert.True(remaining.Remove(d));
-                    }
-
-                    Assert.Equal(0, remaining.Count);
+                    await listener.Close();
                 }
-
-                await Task.WhenAll(writeTasks);
-                await CloseConnections(clientConns, serverConns);
-                for (int i = 0; i < serverSettings.MaxConnections + 1; ++i)
-                {
-                    ClientConnection cliConn = new ClientConnection(uriParams, settings);
-                    await cliConn.Connect();
-                    clientConns.Add(cliConn);
-                }
-
-                end = DateTime.Now.AddMinutes(10);
-                while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
-                {
-                    await Task.Delay(200);
-                    foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
-                    {
-                        serverConns.Add(serverConn);
-                    }
-                }
-
-                Assert.Equal(serverSettings.MaxConnections, serverConns.Count);
-                await CloseConnections(clientConns, serverConns);
-                await listener.Close();
             }
         }
 
         [Theory]
-        [InlineData("mcs://localhost/foo", "foo", "bar")]
-        [InlineData("mcs://localhost/foo", "foo", "bar")]
+        [InlineData("mcs://localhost:9001/foo", "foo", "bar")]
+        [InlineData("mcs://localhost:9002/foo", "foo", "bar")]
         public async Task TlsNegotationFailsWithMismatchedPassphrases(string uri, string passPhrase1, string passPhrase2)
         {
             Assert.NotEqual(passPhrase1, passPhrase2);
@@ -198,37 +204,43 @@ namespace MS.MulticastDownloader.Tests.IO
             using (ServerListener listener = new ServerListener(uriParams, settings, serverSettings))
             {
                 await listener.Listen();
-                ClientConnection clientConn = new ClientConnection(uriParams, settings);
-                await clientConn.Connect();
-                ServerConnection serverConn = null;
-                DateTime end = DateTime.Now.AddMinutes(10);
-                while (DateTime.Now < end && serverConn == null)
-                {
-                    await Task.Delay(200);
-                    foreach (ServerConnection conn in await listener.ReceiveConnections(CancellationToken.None))
-                    {
-                        serverConn = conn;
-                        break;
-                    }
-                }
-
                 try
                 {
-                    List<Task> tlsTasks = new List<Task>();
-                    byte[] secret1 = CreateSecret(passPhrase1);
-                    tlsTasks.Add(Task.Run(() => clientConn.ConnectTls(secret1)));
-                    byte[] secret2 = CreateSecret(passPhrase2);
-                    tlsTasks.Add(Task.Run(() => serverConn.AcceptTls(secret2)));
-                    await Task.WhenAll(tlsTasks);
-                    Assert.True(false);
-                }
-                catch (Exception)
-                {
-                }
+                    ClientConnection clientConn = new ClientConnection(uriParams, settings);
+                    await clientConn.Connect();
+                    ServerConnection serverConn = null;
+                    DateTime end = DateTime.Now.AddMinutes(10);
+                    while (DateTime.Now < end && serverConn == null)
+                    {
+                        await Task.Delay(200);
+                        foreach (ServerConnection conn in await listener.ReceiveConnections(CancellationToken.None))
+                        {
+                            serverConn = conn;
+                            break;
+                        }
+                    }
 
-                await clientConn.Close();
-                await serverConn.Close();
-                await listener.Close();
+                    try
+                    {
+                        List<Task> tlsTasks = new List<Task>();
+                        byte[] secret1 = CreateSecret(passPhrase1);
+                        tlsTasks.Add(Task.Run(() => clientConn.ConnectTls(secret1)));
+                        byte[] secret2 = CreateSecret(passPhrase2);
+                        tlsTasks.Add(Task.Run(() => serverConn.AcceptTls(secret2)));
+                        await Task.WhenAll(tlsTasks);
+                        Assert.True(false);
+                    }
+                    catch (Exception)
+                    {
+                    }
+
+                    await clientConn.Close();
+                    await serverConn.Close();
+                }
+                finally
+                {
+                    await listener.Close();
+                }
             }
         }
 

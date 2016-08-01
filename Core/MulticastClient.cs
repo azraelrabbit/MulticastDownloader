@@ -20,14 +20,12 @@ namespace MS.MulticastDownloader.Core
     /// <summary>
     /// Represent a multicast client.
     /// </summary>
-    /// <typeparam name="TReader">The type of the UDP reader.</typeparam>
     /// <see cref="ITransferReporting" />
     /// <see cref="ISequenceReporting" />
     /// <see cref="IReceptionReporting" />
-    public class MulticastClient<TReader> : IDisposable, ITransferReporting, ISequenceReporting, IReceptionReporting
-        where TReader : IUdpMulticast, new()
+    public class MulticastClient : IDisposable, ITransferReporting, ISequenceReporting, IReceptionReporting
     {
-        private ILog log = LogManager.GetLogger<MulticastClient<TReader>>();
+        private ILog log = LogManager.GetLogger<MulticastClient>();
         private IEncoderFactory fileEncoder;
         private CancellationToken token;
         private FileHeader[] files = null;
@@ -35,7 +33,8 @@ namespace MS.MulticastDownloader.Core
         private BitVector written;
         private ClientConnection cliConn;
         private ChunkWriter writer;
-        private UdpReader<TReader> udpReader;
+        private IUdpMulticast udpMulticast;
+        private UdpReader udpReader;
         private BoxedLong seqNum;
         private BoxedLong waveNum;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
@@ -48,24 +47,26 @@ namespace MS.MulticastDownloader.Core
         private bool complete = false;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MulticastClient{TReader}"/> class.
+        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
         /// </summary>
+        /// <param name="udpMulticast">The <see cref="IUdpMulticast"/> implementation.</param>
         /// <param name="path">The path.</param>
         /// <param name="settings">The settings.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastClient(Uri path, IMulticastSettings settings)
-            : this(path, settings, 0)
+        public MulticastClient(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings)
+            : this(udpMulticast, path, settings, 0)
         {
         }
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MulticastClient{TReader}"/> class.
+        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
         /// </summary>
+        /// <param name="udpMulticast">The <see cref="IUdpMulticast"/> implementation.</param>
         /// <param name="path">The path.</param>
         /// <param name="settings">The settings.</param>
         /// <param name="state">The application-defined state.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastClient(Uri path, IMulticastSettings settings, int state)
+        public MulticastClient(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings, int state)
         {
             if (settings == null)
             {
@@ -82,6 +83,7 @@ namespace MS.MulticastDownloader.Core
 
             this.token = CancellationToken.None;
             this.state = state;
+            this.udpMulticast = udpMulticast;
         }
 
         /// <summary>
@@ -109,7 +111,7 @@ namespace MS.MulticastDownloader.Core
         }
 
         /// <summary>
-        /// Gets a value indicating whether this <see cref="MulticastClient{TReader}"/> is complete.
+        /// Gets a value indicating whether this <see cref="MulticastClient"/> is complete.
         /// </summary>
         /// <value>
         ///   <c>true</c> if complete; otherwise, <c>false</c>.
@@ -446,13 +448,13 @@ namespace MS.MulticastDownloader.Core
         {
             try
             {
-                this.udpReader = await this.cliConn.JoinMulticastServer<TReader>(response, this.fileEncoder);
+                this.udpReader = await this.cliConn.JoinMulticastServer(this.udpMulticast, response, this.fileEncoder);
                 this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
                 while (!this.complete)
                 {
-                    List<FileSegment> received = new List<FileSegment>(await this.udpReader.ReceiveMulticast<FileSegment>(this.token));
+                    ICollection<FileSegment> received = await this.udpReader.ReceiveMulticast<FileSegment>(this.token);
                     FileSegment last = received.LastOrDefault();
                     if (last != null)
                     {

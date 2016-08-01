@@ -27,15 +27,13 @@ namespace MS.MulticastDownloader.Core.IO
         Task Connect(string interfaceName, string multicastAddr, int multicastPort, int ttl);
 
         /// <summary>
-        /// Reads the multicast data into the data received handler until the cancellation token is invoked.
+        /// Reads the next multicast data into the buffer.
         /// </summary>
-        /// <param name="dataReceived">The data received.</param>
-        /// <param name="token">The token.</param>
-        /// <returns>A task object.</returns>
-        Task Read(Action<byte[]> dataReceived, CancellationToken token);
+        /// <returns>A task object which yields the next multicast data.</returns>
+        Task<byte[]> Receive();
 
         /// <summary>
-        /// Sends the specified multicast data.
+        /// Sends the specified multicast data from the buffer.
         /// </summary>
         /// <param name="data">The data.</param>
         /// <returns>A task object.</returns>

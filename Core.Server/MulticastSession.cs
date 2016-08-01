@@ -23,25 +23,23 @@ namespace MS.MulticastDownloader.Core.Server
     /// <summary>
     /// Represent a multicast session.
     /// </summary>
-    /// <typeparam name="TWriter">The type of the UDP writer.</typeparam>
     /// <seealso cref="ServerBase" />
     /// <seealso cref="ITransferReporting" />
     /// <seealso cref="ISequenceReporting" />
-    public class MulticastSession<TWriter> : ServerBase, IEquatable<MulticastSession<TWriter>>, ITransferReporting, ISequenceReporting
-            where TWriter : IUdpMulticast, new()
+    public class MulticastSession : ServerBase, IEquatable<MulticastSession>, ITransferReporting, ISequenceReporting
     {
-        private ILog log = LogManager.GetLogger<MulticastSession<TWriter>>();
+        private ILog log = LogManager.GetLogger<MulticastSession>();
         private BitVector written;
         private ChunkReader reader;
         private FileSet fileSet;
-        private UdpWriter<TWriter> writer;
+        private UdpWriter writer;
         private BoxedLong seqNum;
         private BoxedLong waveNum;
         private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
         private BoxedLong bytesPerSecond;
         private bool disposed;
 
-        internal MulticastSession(MulticastServer<TWriter> server, string path, int sessionId)
+        internal MulticastSession(MulticastServer server, string path, int sessionId)
         {
             Contract.Requires(server != null && !string.IsNullOrEmpty(path));
             Contract.Requires(sessionId >= 0);
@@ -223,7 +221,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal MulticastServer<TWriter> Server
+        internal MulticastServer Server
         {
             get;
             private set;
@@ -292,7 +290,7 @@ namespace MS.MulticastDownloader.Core.Server
         {
             if (obj != null)
             {
-                return base.Equals(obj as MulticastSession<TWriter>);
+                return base.Equals(obj as MulticastSession);
             }
 
             return base.Equals(obj);
@@ -305,7 +303,7 @@ namespace MS.MulticastDownloader.Core.Server
         /// <returns>
         /// true if the current object is equal to the <paramref name="other" /> parameter; otherwise, false.
         /// </returns>
-        public bool Equals(MulticastSession<TWriter> other)
+        public bool Equals(MulticastSession other)
         {
             if (other != null && this != other)
             {
@@ -343,7 +341,7 @@ namespace MS.MulticastDownloader.Core.Server
             return "Session:" + this.SessionId + "'" + this.Path + "'";
         }
 
-        internal async Task StartSession(UdpWriter<TWriter> writer, CancellationToken token)
+        internal async Task StartSession(UdpWriter writer, CancellationToken token)
         {
             Contract.Requires(writer != null);
             this.writer = writer;
@@ -374,10 +372,10 @@ namespace MS.MulticastDownloader.Core.Server
             this.written = new BitVector(this.fileSet.NumSegments);
         }
 
-        internal void CalculatePayload(ICollection<MulticastConnection<TWriter>> connections)
+        internal void CalculatePayload(ICollection<MulticastConnection> connections)
         {
             List<BitVector> sessionVectors = new List<BitVector>(connections.Count);
-            foreach (MulticastConnection<TWriter> conn in connections)
+            foreach (MulticastConnection conn in connections)
             {
                 sessionVectors.Add(conn.Written);
             }

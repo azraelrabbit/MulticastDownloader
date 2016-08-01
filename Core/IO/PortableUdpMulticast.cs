@@ -23,6 +23,7 @@ namespace MS.MulticastDownloader.Core.IO
     {
         private ILog log = LogManager.GetLogger<PortableUdpMulticast>();
         private UdpSocketMulticastClient multicastClient = new UdpSocketMulticastClient();
+        private TaskCompletionSource<byte[]> readTcs = new TaskCompletionSource<byte[]>();
         private bool disposed;
 
         /// <summary>
@@ -33,6 +34,12 @@ namespace MS.MulticastDownloader.Core.IO
         /// </returns>
         public async Task Close()
         {
+            TaskCompletionSource<byte[]> readTcs = this.readTcs;
+            if (readTcs != null)
+            {
+                readTcs.TrySetCanceled();
+            }
+
             if (this.multicastClient != null)
             {
                 await this.multicastClient.DisconnectAsync();
@@ -71,32 +78,27 @@ namespace MS.MulticastDownloader.Core.IO
             }
 
             await this.multicastClient.JoinMulticastGroupAsync(multicastAddr, multicastPort, commsInterface);
+            this.multicastClient.MessageReceived += (o, e) =>
+            {
+                TaskCompletionSource<byte[]> readTcs = this.readTcs;
+                if (readTcs != null)
+                {
+                    readTcs.TrySetResult(e.ByteData);
+                }
+            };
         }
 
         /// <summary>
-        /// Reads the multicast data into the data received handler until the cancellation token is invoked.
+        /// Reads the next multicast data into the buffer.
         /// </summary>
-        /// <param name="dataReceived">The data received.</param>
-        /// <param name="token">The token.</param>
         /// <returns>
-        /// A task object.
+        /// A task object which yields the next multicast data.
         /// </returns>
-        public Task Read(Action<byte[]> dataReceived, CancellationToken token)
+        public async Task<byte[]> Receive()
         {
-            return Task.Run(() =>
-            {
-                using (AutoResetEvent cancelationEvent = new AutoResetEvent(false))
-                using (CancellationTokenRegistration ctr = token.Register(() => cancelationEvent.Set()))
-                {
-                    this.multicastClient.MessageReceived += (o, e) =>
-                    {
-                        dataReceived(e.ByteData);
-                    };
-
-                    cancelationEvent.WaitOne();
-                    token.ThrowIfCancellationRequested();
-                }
-            });
+            byte[] ret = await this.readTcs.Task;
+            this.readTcs = new TaskCompletionSource<byte[]>();
+            return ret;
         }
 
         /// <summary>

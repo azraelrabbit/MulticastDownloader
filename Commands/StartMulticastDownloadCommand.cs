@@ -24,7 +24,7 @@ namespace MS.MulticastDownloader.Commands
     /// <para type="description">This starts a multicast download using the specified parameters. This call will block until the download is complete.</para>
     /// </summary>
     /// <seealso cref="Cmdlet" />
-    /// <seealso cref="MulticastClient{TReader}"/>
+    /// <seealso cref="MulticastClient"/>
     [Cmdlet(VerbsLifecycle.Start, "MulticastDownload")]
     public class StartMulticastDownloadCommand : MulticastCmdlet, IMulticastSettings
     {
@@ -175,7 +175,7 @@ namespace MS.MulticastDownloader.Commands
                 this.encoderFactory = await AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, this.publicKey, AsymmetricSecretFlags.None);
             }
 
-            using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(this.Uri, this))
+            using (MulticastClient client = new MulticastClient(new PortableUdpMulticast(), this.Uri, this))
             {
                 Task transferTask = client.StartTransfer(this.Token);
                 if (this.DisplayUiStatus)

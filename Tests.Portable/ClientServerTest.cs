@@ -37,36 +37,42 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             int szFile = await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    Assert.Equal(1, server.Connections.Count);
-                    Assert.Equal(1, server.Sessions.Count);
-                    Assert.Null(server.ChallengeKey);
-                    Assert.Equal(0, server.BytesPerSecond);
-                    Assert.Equal(0, server.BytesRemaining);
-                    Assert.Equal(null, server.EncoderFactory);
-                    Assert.Equal(1, server.ReceptionRate);
-                    Assert.Equal(1, client.ReceptionRate);
-                    Assert.Equal(szFile, client.TotalBytes);
-                    Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
-                    Assert.Equal(0, server.Sessions.First().SessionId);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        Assert.Equal(1, server.Connections.Count);
+                        Assert.Equal(1, server.Sessions.Count);
+                        Assert.Null(server.ChallengeKey);
+                        Assert.Equal(0, server.BytesPerSecond);
+                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.Equal(null, server.EncoderFactory);
+                        Assert.Equal(1, server.ReceptionRate);
+                        Assert.Equal(1, client.ReceptionRate);
+                        Assert.Equal(szFile, client.TotalBytes);
+                        Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
+                        Assert.Equal(0, server.Sessions.First().SessionId);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
                 }
-                catch (OperationCanceledException)
+                finally
                 {
+                    await server.Close();
                 }
             }
         }
@@ -82,39 +88,44 @@ namespace MS.MulticastDownloader.Tests
             IFile testFile = await inFolder.CreateFileAsync("test1", CreationCollisionOption.ReplaceExisting);
             int szFile = await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    Assert.Equal(1, server.Connections.Count);
-                    Assert.Equal(1, server.Sessions.Count);
-                    Assert.NotNull(server.ChallengeKey);
-                    Assert.Equal(0, server.BytesPerSecond);
-                    Assert.Equal(0, server.BytesRemaining);
-                    Assert.NotNull(server.EncoderFactory);
-                    Assert.Equal(1, server.ReceptionRate);
-                    Assert.Equal(1, client.ReceptionRate);
-                    Assert.Equal(szFile, client.TotalBytes);
-                    Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
-                    Assert.Equal(0, server.Sessions.First().SessionId);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    Task serverTask = server.AcceptAndJoinClients(cts.Token);
 
-                await server.Close();
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        Assert.Equal(1, server.Connections.Count);
+                        Assert.Equal(1, server.Sessions.Count);
+                        Assert.NotNull(server.ChallengeKey);
+                        Assert.Equal(0, server.BytesPerSecond);
+                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.NotNull(server.EncoderFactory);
+                        Assert.Equal(1, server.ReceptionRate);
+                        Assert.Equal(1, client.ReceptionRate);
+                        Assert.Equal(szFile, client.TotalBytes);
+                        Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
+                        Assert.Equal(0, server.Sessions.First().SessionId);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -129,39 +140,43 @@ namespace MS.MulticastDownloader.Tests
             IFile testFile = await inFolder.CreateFileAsync("test1", CreationCollisionOption.ReplaceExisting);
             int szFile = await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    Assert.Equal(1, server.Connections.Count);
-                    Assert.Equal(1, server.Sessions.Count);
-                    Assert.NotNull(server.ChallengeKey);
-                    Assert.Equal(0, server.BytesPerSecond);
-                    Assert.Equal(0, server.BytesRemaining);
-                    Assert.NotNull(server.EncoderFactory);
-                    Assert.Equal(1, server.ReceptionRate);
-                    Assert.Equal(1, client.ReceptionRate);
-                    Assert.Equal(szFile, client.TotalBytes);
-                    Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
-                    Assert.Equal(0, server.Sessions.First().SessionId);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        Assert.Equal(1, server.Connections.Count);
+                        Assert.Equal(1, server.Sessions.Count);
+                        Assert.NotNull(server.ChallengeKey);
+                        Assert.Equal(0, server.BytesPerSecond);
+                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.NotNull(server.EncoderFactory);
+                        Assert.Equal(1, server.ReceptionRate);
+                        Assert.Equal(1, client.ReceptionRate);
+                        Assert.Equal(szFile, client.TotalBytes);
+                        Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
+                        Assert.Equal(0, server.Sessions.First().SessionId);
+                        await client.Close();
+                    }
 
-                await server.Close();
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -174,39 +189,43 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             int szFile = await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    Assert.Equal(1, server.Connections.Count);
-                    Assert.Equal(1, server.Sessions.Count);
-                    Assert.NotNull(server.ChallengeKey);
-                    Assert.Equal(0, server.BytesPerSecond);
-                    Assert.Equal(0, server.BytesRemaining);
-                    Assert.NotNull(server.EncoderFactory);
-                    Assert.Equal(1, server.ReceptionRate);
-                    Assert.Equal(1, client.ReceptionRate);
-                    Assert.Equal(szFile, client.TotalBytes);
-                    Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
-                    Assert.Equal(0, server.Sessions.First().SessionId);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        Assert.Equal(1, server.Connections.Count);
+                        Assert.Equal(1, server.Sessions.Count);
+                        Assert.NotNull(server.ChallengeKey);
+                        Assert.Equal(0, server.BytesPerSecond);
+                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.NotNull(server.EncoderFactory);
+                        Assert.Equal(1, server.ReceptionRate);
+                        Assert.Equal(1, client.ReceptionRate);
+                        Assert.Equal(szFile, client.TotalBytes);
+                        Assert.Equal(client.WaveNumber, server.Sessions.First().WaveNumber);
+                        Assert.Equal(0, server.Sessions.First().SessionId);
+                        await client.Close();
+                    }
 
-                await server.Close();
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -220,37 +239,41 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(0, server.Connections.Count);
-                    Assert.Equal(0, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
 
-                await server.Close();
+                        Assert.Equal(0, server.Connections.Count);
+                        Assert.Equal(0, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -264,37 +287,41 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder1, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder1, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder2, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(0, server.Connections.Count);
-                    Assert.Equal(0, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder2, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
 
-                await server.Close();
+                        Assert.Equal(0, server.Connections.Count);
+                        Assert.Equal(0, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -309,37 +336,41 @@ namespace MS.MulticastDownloader.Tests
             IFile testFile = await inFolder.CreateFileAsync("test1", CreationCollisionOption.ReplaceExisting);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(0, server.Connections.Count);
-                    Assert.Equal(0, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
 
-                await server.Close();
+                        Assert.Equal(0, server.Connections.Count);
+                        Assert.Equal(0, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -354,37 +385,41 @@ namespace MS.MulticastDownloader.Tests
             IFile testFile = await inFolder.CreateFileAsync("test1", CreationCollisionOption.ReplaceExisting);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(0, server.Connections.Count);
-                    Assert.Equal(0, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
 
-                await server.Close();
+                        Assert.Equal(0, server.Connections.Count);
+                        Assert.Equal(0, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -396,38 +431,42 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri(uri), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
-                {
-                    await client.ConnectToServer();
-                    try
-                    {
-                        await client.RequestFilesAndBeginReading();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(0, server.Connections.Count);
-                    Assert.Equal(0, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri(uri), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
+                    {
+                        await client.ConnectToServer();
+                        try
+                        {
+                            await client.RequestFilesAndBeginReading();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
 
-                await server.Close();
+                        Assert.Equal(0, server.Connections.Count);
+                        Assert.Equal(0, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -440,53 +479,58 @@ namespace MS.MulticastDownloader.Tests
             MulticastServerSettings serverSettings = new MulticastServerSettings(DelayCalculation.AverageThroughput, interfaceName, ipv6, 10 << 20, maxSessions, maxConnections, 576, "239.0.0.1", 1000, 0xFF00);
             await CreateTestPayload(folder);
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-                List<MulticastClient<PortableUdpMulticast>> clients = new List<MulticastClient<PortableUdpMulticast>>();
-                for (int i = 0; i < maxConnections; ++i)
-                {
-                    MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + i.ToString(), CreationCollisionOption.ReplaceExisting)));
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    clients.Add(client);
-                }
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + maxConnections.ToString(), CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(maxConnections, server.Connections.Count);
-                    Assert.Equal(1, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                foreach (MulticastClient<PortableUdpMulticast> client in clients)
-                {
-                    await client.Close();
-                    client.Dispose();
-                }
-
-                clients.Clear();
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    List<MulticastClient> clients = new List<MulticastClient>();
+                    for (int i = 0; i < maxConnections; ++i)
+                    {
+                        MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + i.ToString(), CreationCollisionOption.ReplaceExisting)));
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        clients.Add(client);
+                    }
 
-                await server.Close();
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + maxConnections.ToString(), CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
+
+                        Assert.Equal(maxConnections, server.Connections.Count);
+                        Assert.Equal(1, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    foreach (MulticastClient client in clients)
+                    {
+                        await client.Close();
+                        client.Dispose();
+                    }
+
+                    clients.Clear();
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 
@@ -502,53 +546,58 @@ namespace MS.MulticastDownloader.Tests
                 await CreateTestPayload(folder, "in" + i.ToString());
             }
 
-            using (MulticastServer<PortableUdpMulticast> server = new MulticastServer<PortableUdpMulticast>(new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
+            using (MulticastServer server = new MulticastServer(new PortableTestUdpMulticast(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
                 Task serverTask = server.AcceptAndJoinClients(cts.Token);
-                List<MulticastClient<PortableUdpMulticast>> clients = new List<MulticastClient<PortableUdpMulticast>>();
-                for (int i = 0; i < maxSessions; ++i)
-                {
-                    MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in" + i.ToString()), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + i.ToString(), CreationCollisionOption.ReplaceExisting)));
-                    await client.ConnectToServer();
-                    await client.RequestFilesAndBeginReading();
-                    clients.Add(client);
-                }
-
-                using (MulticastClient<PortableUdpMulticast> client = new MulticastClient<PortableUdpMulticast>(new Uri("mc://localhost/in" + maxSessions.ToString()), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + maxSessions.ToString(), CreationCollisionOption.ReplaceExisting))))
-                {
-                    try
-                    {
-                        await client.ConnectToServer();
-                        await client.RequestFilesAndBeginReading();
-                        Assert.False(true);
-                    }
-                    catch (Exception)
-                    {
-                    }
-
-                    Assert.Equal(maxSessions, server.Sessions.Count);
-                    await client.Close();
-                }
-
-                foreach (MulticastClient<PortableUdpMulticast> client in clients)
-                {
-                    await client.Close();
-                    client.Dispose();
-                }
-
-                clients.Clear();
-
-                cts.Cancel();
                 try
                 {
-                    await serverTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
+                    List<MulticastClient> clients = new List<MulticastClient>();
+                    for (int i = 0; i < maxSessions; ++i)
+                    {
+                        MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in" + i.ToString()), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + i.ToString(), CreationCollisionOption.ReplaceExisting)));
+                        await client.ConnectToServer();
+                        await client.RequestFilesAndBeginReading();
+                        clients.Add(client);
+                    }
 
-                await server.Close();
+                    using (MulticastClient client = new MulticastClient(new PortableTestUdpMulticast(), new Uri("mc://localhost/in" + maxSessions.ToString()), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out" + maxSessions.ToString(), CreationCollisionOption.ReplaceExisting))))
+                    {
+                        try
+                        {
+                            await client.ConnectToServer();
+                            await client.RequestFilesAndBeginReading();
+                            Assert.False(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
+
+                        Assert.Equal(maxSessions, server.Sessions.Count);
+                        await client.Close();
+                    }
+
+                    foreach (MulticastClient client in clients)
+                    {
+                        await client.Close();
+                        client.Dispose();
+                    }
+
+                    clients.Clear();
+
+                    cts.Cancel();
+                    try
+                    {
+                        await serverTask;
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                }
+                finally
+                {
+                    await server.Close();
+                }
             }
         }
 

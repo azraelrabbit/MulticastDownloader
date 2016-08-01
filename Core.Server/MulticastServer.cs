@@ -26,13 +26,11 @@ namespace MS.MulticastDownloader.Core.Server
     /// <summary>
     /// Represent a multicast server.
     /// </summary>
-    /// <typeparam name="TWriter">The type of the UDP writer.</typeparam>
     /// <seealso cref="ServerBase" />
-    /// <seealso cref="MulticastConnection{TWriter}" />
-    /// <seealso cref="MulticastSession{TWriter}" />
+    /// <seealso cref="MulticastConnection" />
+    /// <seealso cref="MulticastSession" />
     /// <seealso cref="IReceptionReporting" />
-    public class MulticastServer<TWriter> : ServerBase, ITransferReporting, IReceptionReporting
-            where TWriter : IUdpMulticast, new()
+    public class MulticastServer : ServerBase, ITransferReporting, IReceptionReporting
     {
         // Clients much respond to any request with the given interval
         internal static readonly TimeSpan ResponseDelay = TimeSpan.FromSeconds(60);
@@ -43,14 +41,15 @@ namespace MS.MulticastDownloader.Core.Server
         private const double DecreaseThreshold = 0.98;
         private const double IncreaseThreshold = 0.90;
 
-        private ILog log = LogManager.GetLogger<MulticastServer<TWriter>>();
+        private ILog log = LogManager.GetLogger<MulticastServer>();
         private object connectionLock = new object();
         private object sessionLock = new object();
-        private List<MulticastConnection<TWriter>> connections = new List<MulticastConnection<TWriter>>();
-        private List<MulticastSession<TWriter>> sessions = new List<MulticastSession<TWriter>>();
-        private MulticastSession<TWriter> activeSession;
+        private List<MulticastConnection> connections = new List<MulticastConnection>();
+        private List<MulticastSession> sessions = new List<MulticastSession>();
+        private MulticastSession activeSession;
         private AutoResetEvent joinEvent = new AutoResetEvent(false);
         private ServerListener listener;
+        private IUdpMulticast udpMulticast;
         private HashEncoderFactory encoderFactory;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
         private CancellationToken token = CancellationToken.None;
@@ -59,13 +58,14 @@ namespace MS.MulticastDownloader.Core.Server
         private bool disposed;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="MulticastServer{TWriter}"/> class.
+        /// Initializes a new instance of the <see cref="MulticastServer"/> class.
         /// </summary>
+        /// <param name="udpMulticast">The <see cref="IUdpMulticast"/> implementation.</param>
         /// <param name="path">The server path.</param>
         /// <param name="settings">The settings.</param>
         /// <param name="serverSettings">The server settings.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastServer(Uri path, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+        public MulticastServer(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings, IMulticastServerSettings serverSettings)
         {
             if (settings == null)
             {
@@ -96,6 +96,8 @@ namespace MS.MulticastDownloader.Core.Server
                 sr.NextBytes(this.ChallengeKey);
                 this.encoderFactory = new HashEncoderFactory(this.ChallengeKey, Constants.EncoderSize);
             }
+
+            this.udpMulticast = udpMulticast;
         }
 
         /// <summary>
@@ -104,7 +106,7 @@ namespace MS.MulticastDownloader.Core.Server
         /// <value>
         /// The connections.
         /// </value>
-        public ICollection<MulticastConnection<TWriter>> Connections
+        public ICollection<MulticastConnection> Connections
         {
             get
             {
@@ -121,7 +123,7 @@ namespace MS.MulticastDownloader.Core.Server
         /// <value>
         /// The sessions.
         /// </value>
-        public ICollection<MulticastSession<TWriter>> Sessions
+        public ICollection<MulticastSession> Sessions
         {
             get
             {
@@ -201,7 +203,7 @@ namespace MS.MulticastDownloader.Core.Server
                 lock (this.sessionLock)
                 {
                     long ret = 0;
-                    foreach (MulticastSession<TWriter> session in this.sessions)
+                    foreach (MulticastSession session in this.sessions)
                     {
                         ret += session.TotalBytes;
                     }
@@ -224,7 +226,7 @@ namespace MS.MulticastDownloader.Core.Server
                 lock (this.sessionLock)
                 {
                     long ret = 0;
-                    foreach (MulticastSession<TWriter> session in this.sessions)
+                    foreach (MulticastSession session in this.sessions)
                     {
                         ret += session.BytesRemaining;
                     }
@@ -244,7 +246,7 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                MulticastSession<TWriter> session = this.activeSession;
+                MulticastSession session = this.activeSession;
                 if (session != null)
                 {
                     return session.BytesPerSecond;
@@ -310,8 +312,8 @@ namespace MS.MulticastDownloader.Core.Server
                                 }
 
                                 // Calculate the multicast payload for the open sessions and transmit a multicast wave.
-                                ICollection<MulticastConnection<TWriter>> waveConnections = await this.CleanupConnections();
-                                ICollection<MulticastSession<TWriter>> waveSessions = this.CalculatePayloadAndCleanupSessions(waveConnections);
+                                ICollection<MulticastConnection> waveConnections = await this.CleanupConnections();
+                                ICollection<MulticastSession> waveSessions = this.CalculatePayloadAndCleanupSessions(waveConnections);
                                 this.token.ThrowIfCancellationRequested();
                                 await this.TransmitUdp(waveSessions, waveConnections);
                                 await this.WaveUpdate();
@@ -343,7 +345,7 @@ namespace MS.MulticastDownloader.Core.Server
         public async Task Close()
         {
             await this.listener.Close();
-            foreach (MulticastConnection<TWriter> conn in this.Connections)
+            foreach (MulticastConnection conn in this.Connections)
             {
                 await conn.Close();
             }
@@ -369,14 +371,14 @@ namespace MS.MulticastDownloader.Core.Server
                     using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
                     {
                         CancellationToken timeoutToken = timeoutCts.Token;
-                        MulticastConnection<TWriter> mcConn = new MulticastConnection<TWriter>(this, conn);
+                        MulticastConnection mcConn = new MulticastConnection(this, conn);
                         string path;
                         try
                         {
                             timeoutCts.CancelAfter(ResponseDelay);
                             path = await mcConn.AcceptConnection(timeoutToken);
 
-                            MulticastSession<TWriter> session = await this.GetSession(path);
+                            MulticastSession session = await this.GetSession(path);
 
                             timeoutCts.CancelAfter(ResponseDelay);
                             await mcConn.JoinSession(session, timeoutToken);
@@ -404,12 +406,12 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal async Task<ICollection<MulticastConnection<TWriter>>> CleanupConnections()
+        internal async Task<ICollection<MulticastConnection>> CleanupConnections()
         {
-            ICollection<MulticastConnection<TWriter>> connections = this.Connections;
-            List<MulticastConnection<TWriter>> newConns = new List<MulticastConnection<TWriter>>(connections.Count);
+            ICollection<MulticastConnection> connections = this.Connections;
+            List<MulticastConnection> newConns = new List<MulticastConnection>(connections.Count);
             DateTime now = DateTime.Now;
-            foreach (MulticastConnection<TWriter> conn in connections)
+            foreach (MulticastConnection conn in connections)
             {
                 if (conn.LeavingSession || conn.WhenExpires < now)
                 {
@@ -426,10 +428,10 @@ namespace MS.MulticastDownloader.Core.Server
             return newConns;
         }
 
-        internal ICollection<MulticastSession<TWriter>> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection<TWriter>> connections)
+        internal ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection> connections)
         {
-            HashSet<MulticastSession<TWriter>> activeSessions = new HashSet<MulticastSession<TWriter>>();
-            foreach (MulticastConnection<TWriter> conn in connections)
+            HashSet<MulticastSession> activeSessions = new HashSet<MulticastSession>();
+            foreach (MulticastConnection conn in connections)
             {
                 activeSessions.Add(conn.Session);
             }
@@ -451,7 +453,7 @@ namespace MS.MulticastDownloader.Core.Server
 
                 long waveRemaining = 0;
                 long waveTotal = 0;
-                foreach (MulticastSession<TWriter> session in this.sessions)
+                foreach (MulticastSession session in this.sessions)
                 {
                     waveRemaining += session.BytesRemaining;
                     waveTotal += session.TotalBytes;
@@ -477,13 +479,13 @@ namespace MS.MulticastDownloader.Core.Server
             });
         }
 
-        internal async Task TransmitUdp(ICollection<MulticastSession<TWriter>> sessions, ICollection<MulticastConnection<TWriter>> connections)
+        internal async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
         {
             using (CancellationTokenSource statusCts = new CancellationTokenSource())
             using (CancellationTokenRegistration statusCancellationTokenCanceller = statusCts.Token.Register(() => statusCts.Cancel()))
             {
                 Task statusUpdate = this.ProcessStatusUpdates(connections, statusCts.Token);
-                foreach (MulticastSession<TWriter> session in sessions)
+                foreach (MulticastSession session in sessions)
                 {
                     this.token.ThrowIfCancellationRequested();
                     this.activeSession = session;
@@ -495,7 +497,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal async Task ProcessStatusUpdates(ICollection<MulticastConnection<TWriter>> connections, CancellationToken updateToken)
+        internal async Task ProcessStatusUpdates(ICollection<MulticastConnection> connections, CancellationToken updateToken)
         {
             bool waveComplete = false;
             using (CancellationTokenRegistration registration = updateToken.Register(() => waveComplete = true))
@@ -523,10 +525,10 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal void UpdateBurstDelay(ICollection<MulticastConnection<TWriter>> connections)
+        internal void UpdateBurstDelay(ICollection<MulticastConnection> connections)
         {
             SortedSet<double> receptionRates = new SortedSet<double>();
-            foreach (MulticastConnection<TWriter> conn in connections)
+            foreach (MulticastConnection conn in connections)
             {
                 this.log.Trace(conn + " bps: " + conn.BytesPerSecond + ", rr: " + conn.ReceptionRate);
                 receptionRates.Add(conn.ReceptionRate);
@@ -572,7 +574,7 @@ namespace MS.MulticastDownloader.Core.Server
             this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay);
         }
 
-        internal async Task<MulticastSession<TWriter>> GetSession(string path)
+        internal async Task<MulticastSession> GetSession(string path)
         {
             IFolder rootFolder = this.Settings.RootFolder;
             ExistenceCheckResult pathExists = await rootFolder.CheckExistsAsync(path);
@@ -591,7 +593,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             HashSet<int> usedSessions = new HashSet<int>();
-            foreach (MulticastSession<TWriter> session in this.Sessions)
+            foreach (MulticastSession session in this.Sessions)
             {
                 if (session.Path == key)
                 {
@@ -610,8 +612,8 @@ namespace MS.MulticastDownloader.Core.Server
             {
                 if (!usedSessions.Contains(i))
                 {
-                    MulticastSession<TWriter> newSession = new MulticastSession<TWriter>(this, key, i);
-                    UdpWriter<TWriter> writer = await this.listener.CreateWriter<TWriter>(i, this.encoderFactory);
+                    MulticastSession newSession = new MulticastSession(this, key, i);
+                    UdpWriter writer = await this.listener.CreateWriter(this.udpMulticast, i, this.encoderFactory);
                     await newSession.StartSession(writer, this.token);
                     lock (this.sessionLock)
                     {
@@ -636,14 +638,14 @@ namespace MS.MulticastDownloader.Core.Server
                 this.disposed = true;
                 if (disposing)
                 {
-                    foreach (MulticastSession<TWriter> session in this.sessions)
+                    foreach (MulticastSession session in this.sessions)
                     {
                         session.Dispose();
                     }
 
                     this.sessions.Clear();
 
-                    foreach (MulticastConnection<TWriter> connection in this.connections)
+                    foreach (MulticastConnection connection in this.connections)
                     {
                         connection.Dispose();
                     }
@@ -668,15 +670,15 @@ namespace MS.MulticastDownloader.Core.Server
         }
 
         // Read a request from each client, and send a response back. Completes when all clients are responded to, or when the built-in response delay completes.
-        private Task RespondToClients<TRequest, TResponse>(Func<TRequest, MulticastConnection<TWriter>, CancellationToken, TResponse> clientAction)
+        private Task RespondToClients<TRequest, TResponse>(Func<TRequest, MulticastConnection, CancellationToken, TResponse> clientAction)
             where TRequest : class
             where TResponse : class
         {
             return Task.Run(() =>
             {
-                ICollection<MulticastConnection<TWriter>> conns = this.Connections;
+                ICollection<MulticastConnection> conns = this.Connections;
                 object listLock = new object();
-                List<MulticastConnection<TWriter>> failedConnections = new List<MulticastConnection<TWriter>>();
+                List<MulticastConnection> failedConnections = new List<MulticastConnection>();
                 using (CancellationTokenSource timeoutCts = new CancellationTokenSource(ResponseDelay))
                 using (CancellationTokenRegistration sessionTokenCanceller = this.token.Register(() => timeoutCts.Cancel()))
                 using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
@@ -709,7 +711,7 @@ namespace MS.MulticastDownloader.Core.Server
                     {
                         lock (this.connectionLock)
                         {
-                            foreach (MulticastConnection<TWriter> conn in failedConnections)
+                            foreach (MulticastConnection conn in failedConnections)
                             {
                                 this.connections.Remove(conn);
                             }

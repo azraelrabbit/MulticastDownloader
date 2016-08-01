@@ -21,18 +21,23 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class UdpWriter<TWriter> : ServerConnectionBase
-        where TWriter : IUdpMulticast, new()
+    internal class UdpWriter : ServerConnectionBase
     {
-        private ILog log = LogManager.GetLogger<UdpWriter<TWriter>>();
+        private ILog log = LogManager.GetLogger<UdpWriter>();
         private IEncoderFactory encoder;
-        private TWriter multicastClient = new TWriter();
+        private IUdpMulticast multicastClient;
         private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool disposed;
 
-        internal UdpWriter(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+        internal UdpWriter(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings, IUdpMulticast udpMulticast)
             : base(parms, settings, serverSettings)
         {
+            if (udpMulticast == null)
+            {
+                throw new ArgumentNullException("udpMulticast");
+            }
+
+            this.multicastClient = udpMulticast;
         }
 
         internal int BlockSize
@@ -91,7 +96,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 }
             }
 
-            await this.multicastClient.Connect(commsInterface.Name, this.MulticastAddress, this.MulticastPort, this.Settings.Ttl);
+            await this.multicastClient.Connect(commsInterface != null ? commsInterface.Name : null, this.MulticastAddress, this.MulticastPort, this.Settings.Ttl);
         }
 
         internal override async Task Close()

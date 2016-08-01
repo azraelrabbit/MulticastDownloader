@@ -19,13 +19,12 @@ namespace MS.MulticastDownloader.Core.IO
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
-    internal class UdpReader<TReader> : ConnectionBase
-        where TReader : IUdpMulticast, new()
+    internal class UdpReader : ConnectionBase
     {
         private const int ReadDelay = 1000;
-        private ILog log = LogManager.GetLogger<UdpReader<TReader>>();
+        private ILog log = LogManager.GetLogger<UdpReader>();
         private IEncoderFactory encoder;
-        private TReader multicastClient = new TReader();
+        private IUdpMulticast multicastClient;
         private int bufferUse = 0;
         private int bufferSize;
         private AutoResetEvent packetQueuedEvent = new AutoResetEvent(false);
@@ -35,9 +34,15 @@ namespace MS.MulticastDownloader.Core.IO
         private ConcurrentBag<IDecoder> encoders = new ConcurrentBag<IDecoder>();
         private bool disposed;
 
-        internal UdpReader(UriParameters parms, IMulticastSettings settings)
+        internal UdpReader(UriParameters parms, IMulticastSettings settings, IUdpMulticast udpMulticast)
             : base(parms, settings)
         {
+            if (udpMulticast == null)
+            {
+                throw new ArgumentNullException("udpMulticast");
+            }
+
+            this.multicastClient = udpMulticast;
         }
 
         internal async Task JoinMulticastServer(SessionJoinResponse response, IEncoderFactory encoder)
@@ -53,7 +58,7 @@ namespace MS.MulticastDownloader.Core.IO
 
             this.log.DebugFormat("UDP reader size: {0} bytes", this.bufferSize);
             await this.multicastClient.Connect(null, response.MulticastAddress, response.MulticastPort, this.Settings.Ttl);
-            this.readTask = this.multicastClient.Read(this.PacketRead, this.readCts.Token);
+            this.readTask = this.ReadTask(this.readCts.Token);
         }
 
         internal override async Task Close()
@@ -74,28 +79,27 @@ namespace MS.MulticastDownloader.Core.IO
             await this.multicastClient.Close();
         }
 
-        internal async Task<IEnumerable<T>> ReceiveMulticast<T>(CancellationToken token)
+        internal async Task<ICollection<T>> ReceiveMulticast<T>(CancellationToken token)
         {
-            Task<IEnumerable<T>> t0 = Task.Run(() =>
+            Task<ICollection<T>> t0 = Task.Run(() =>
             {
                 int received = 0;
                 int bufferSize = this.Settings.MulticastBufferSize;
                 IEncoderFactory encoderFactory = this.encoder;
-                List<byte[]> pendingDeserializes = new List<byte[]>(this.multicastPackets.Count);
+                int dequeued = 0;
+                int count = this.multicastPackets.Count;
+                List<byte[]> pendingDeserializes = new List<byte[]>(count);
                 this.packetQueuedEvent.WaitOne(ReadDelay);
                 byte[] next;
-                while (this.multicastPackets.TryDequeue(out next))
+                while (dequeued < count && received < bufferSize && this.multicastPackets.TryDequeue(out next))
                 {
                     token.ThrowIfCancellationRequested();
                     pendingDeserializes.Add(next);
                     received += next.Length;
-                    if (received >= bufferSize)
-                    {
-                        break;
-                    }
+                    ++dequeued;
                 }
 
-                IEnumerable<T> ret = pendingDeserializes.AsParallel().Select((d) =>
+                ICollection<T> ret = pendingDeserializes.AsParallel().Select((d) =>
                 {
                     if (encoderFactory != null)
                     {
@@ -105,8 +109,12 @@ namespace MS.MulticastDownloader.Core.IO
                             encoder = encoderFactory.CreateDecoder();
                         }
 
-                        next = encoder.Decode(next);
+                        next = encoder.Decode(d);
                         this.encoders.Add(encoder);
+                    }
+                    else
+                    {
+                        next = d;
                     }
 
                     using (MemoryStream ms = new MemoryStream(next))
@@ -162,6 +170,21 @@ namespace MS.MulticastDownloader.Core.IO
             this.bufferUse += data.Length;
             this.multicastPackets.Enqueue(data);
             this.packetQueuedEvent.Set();
+        }
+
+        private Task ReadTask(CancellationToken token)
+        {
+            Task t0 = Task.Run(async () =>
+            {
+                for (; ;)
+                {
+                    token.ThrowIfCancellationRequested();
+                    byte[] read = await this.multicastClient.Receive();
+                    this.PacketRead(read);
+                }
+            });
+
+            return t0.WaitWithCancellation(token);
         }
     }
 }
