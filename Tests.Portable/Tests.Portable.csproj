@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="ClientServerTest.cs" />
     <Compile Include="Cryptography\EncoderTest.cs" />
+    <Compile Include="DownloadTest.cs" />
     <Compile Include="IO\ChunkTest.cs" />
     <Compile Include="IO\SessionTest.cs" />
     <Compile Include="IO\UdpTest.cs" />
