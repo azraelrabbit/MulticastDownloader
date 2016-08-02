@@ -10,42 +10,42 @@ namespace MS.MulticastDownloader.Tests
     using System.Threading;
     using System.Threading.Tasks;
     using Core.IO;
+    using Xunit;
 
     internal class PortableTestUdpMulticast : IUdpMulticast
     {
-        private static PortableTestUdpMulticastFactory factory = new PortableTestUdpMulticastFactory();
+        private Random r = new Random();
+        private PortableTestUdpMulticastFactory factory;
         private UdpSocket socket;
         private bool disposedValue = false;
 
-        private PortableTestUdpMulticast()
+        private PortableTestUdpMulticast(PortableTestUdpMulticastFactory factory)
         {
-        }
-
-        public static IUdpMulticastFactory Factory
-        {
-            get
-            {
-                return factory;
-            }
+            this.factory = factory;
         }
 
         public Task Connect(string interfaceName, string multicastAddr, int multicastPort, int ttl)
         {
             return Task.Run(() =>
             {
-                string ifKey = (interfaceName ?? string.Empty) + ":" + (multicastAddr ?? string.Empty) + ":" + multicastPort + ":" + ttl;
-                this.socket = factory.Connect(ifKey);
+                this.socket = this.factory.Connect();
             });
         }
 
-        public Task<byte[]> Receive()
+        public async Task<byte[]> Receive()
         {
-            return this.socket.Recieve();
+            byte[] ret = await this.socket.Recieve();
+            Assert.True(ret.Length <= this.factory.Mtu);
+            return ret;
         }
 
-        public Task Send(byte[] data)
+        public async Task Send(byte[] data)
         {
-            return this.socket.Send(data);
+            Assert.True(data.Length <= this.factory.Mtu);
+            if (this.r.NextDouble() <= this.factory.PacketReceptionRate)
+            {
+                await this.socket.Send(data);
+            }
         }
 
         public Task Close()
@@ -56,6 +56,21 @@ namespace MS.MulticastDownloader.Tests
         public void Dispose()
         {
             this.Dispose(true);
+        }
+
+        internal static IUdpMulticastFactory CreateFactory(int mtu, double packetReceptionRate)
+        {
+            return new PortableTestUdpMulticastFactory(mtu, packetReceptionRate);
+        }
+
+        internal static IUdpMulticastFactory CreateFactory(int mtu)
+        {
+            return CreateFactory(mtu, 1.0);
+        }
+
+        internal static IUdpMulticastFactory CreateFactory()
+        {
+            return CreateFactory(576, 1.0);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -70,25 +85,18 @@ namespace MS.MulticastDownloader.Tests
             }
         }
 
-        private class UdpSocket : IDisposable
+        private class UdpSocket
         {
             private object bufferLock = new object();
             private Queue<byte[]> buffer = new Queue<byte[]>();
-            private AutoResetEvent sentEvent = new AutoResetEvent(false);
-            private bool disposed = false;
-
-            public void Dispose()
-            {
-                this.Dispose(true);
-            }
 
             internal Task<byte[]> Recieve()
             {
-                return Task.Run(() =>
+                return Task.Run(async () =>
                 {
                     while (this.buffer.Count == 0)
                     {
-                        this.sentEvent.WaitOne(200);
+                        await Task.Delay(200);
                     }
 
                     lock (this.bufferLock)
@@ -106,48 +114,46 @@ namespace MS.MulticastDownloader.Tests
                     {
                         this.buffer.Enqueue(data);
                     }
-
-                    this.sentEvent.Set();
                 });
-            }
-
-            protected virtual void Dispose(bool disposing)
-            {
-                if (!this.disposed)
-                {
-                    this.disposed = true;
-                    if (disposing)
-                    {
-                        if (this.sentEvent != null)
-                        {
-                            this.sentEvent.Dispose();
-                        }
-                    }
-                }
             }
         }
 
         private class PortableTestUdpMulticastFactory : IUdpMulticastFactory
         {
-            private object recieveLock = new object();
-            private Dictionary<string, UdpSocket> socketsByIfKey = new Dictionary<string, UdpSocket>();
+            private readonly int mtu;
+            private readonly double packetReceptionRate;
+            private UdpSocket socket = new UdpSocket();
+
+            internal PortableTestUdpMulticastFactory(int mtu, double packetReceptionRate)
+            {
+                this.mtu = mtu;
+                this.packetReceptionRate = packetReceptionRate;
+            }
+
+            internal int Mtu
+            {
+                get
+                {
+                    return this.mtu;
+                }
+            }
+
+            internal double PacketReceptionRate
+            {
+                get
+                {
+                    return this.packetReceptionRate;
+                }
+            }
 
             public IUdpMulticast CreateMulticast()
             {
-                return new PortableTestUdpMulticast();
+                return new PortableTestUdpMulticast(this);
             }
 
-            internal UdpSocket Connect(string ifKey)
+            internal UdpSocket Connect()
             {
-                lock (this.recieveLock)
-                {
-                    if (!this.socketsByIfKey.ContainsKey(ifKey))
-                    {
-                        this.socketsByIfKey[ifKey] = new UdpSocket();
-                    }
-
-                    return this.socketsByIfKey[ifKey];
-                }
+                return this.socket;
             }
         }
     }

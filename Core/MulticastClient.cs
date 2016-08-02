@@ -482,13 +482,14 @@ namespace MS.MulticastDownloader.Core
                 Task statusTask = this.UpdateStatus();
                 while (!this.complete)
                 {
-                    ICollection<FileSegment> received = await this.udpReader.ReceiveMulticast(Constants.ReadDelay, this.token);
+                    ICollection<FileSegment> received = await this.udpReader.ReceiveMulticast(Constants.ReadDelay);
                     FileSegment last = received.LastOrDefault();
-                    if (last != null)
+                    if (last == null)
                     {
-                        this.seqNum = new BoxedLong(last.SegmentId);
+                        continue;
                     }
 
+                    this.seqNum = new BoxedLong(last.SegmentId);
                     if (this.writeTask != null)
                     {
                         await this.writeTask;

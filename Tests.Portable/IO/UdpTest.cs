@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Tests.IO
     using System;
     using System.Collections.Generic;
     using System.Linq;
+    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using Common.Logging;
@@ -30,15 +31,16 @@ namespace MS.MulticastDownloader.Tests.IO
         }
 
         [Theory]
-        [InlineData("mc://localhost", 1 << 20, 1, 10, 1, 576)]
-        [InlineData("mc://localhost", 1 << 20, 1, 100, 10, 576)]
+        [InlineData("mc://localhost:10001", 1 << 20, 1, 10, 1, 576)]
+        [InlineData("mc://localhost:10002", 1 << 20, 1, 100, 10, 1500)]
         public async Task UdpReaderAndWriterCanCommunicate(string uri, int bufferSize, int ttl, int numAttempts, int burstSize, int mtu)
         {
             UriParameters parms = new UriParameters(new Uri(uri));
             MulticastSettings settings = new MulticastSettings(null, bufferSize, ttl);
             MulticastServerSettings serverSettings = new MulticastServerSettings(false, mtu);
-            using (UdpReader<FileSegment> reader = new UdpReader<FileSegment>(parms, settings, PortableTestUdpMulticast.Factory.CreateMulticast()))
-            using (UdpWriter writer = new UdpWriter(parms, settings, serverSettings, PortableTestUdpMulticast.Factory.CreateMulticast()))
+            IUdpMulticastFactory factory = PortableTestUdpMulticast.CreateFactory(mtu);
+            using (UdpReader<FileSegment> reader = new UdpReader<FileSegment>(parms, settings, factory.CreateMulticast()))
+            using (UdpWriter writer = new UdpWriter(parms, settings, serverSettings, factory.CreateMulticast()))
             {
                 try
                 {
@@ -46,6 +48,104 @@ namespace MS.MulticastDownloader.Tests.IO
                     await writer.StartMulticastServer(0, null);
                     await reader.JoinMulticastServer(new SessionJoinResponse { Ipv6 = false, Mtu = mtu, MulticastAddress = serverSettings.MulticastAddress, MulticastBurstLength = burstSize, MulticastPort = serverSettings.MulticastStartPort }, null);
                     await MulticastLoopback(numAttempts, burstSize, mtu, reader, writer, r);
+                }
+                finally
+                {
+                    await reader.Close();
+                    await writer.Close();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("mc://localhost:11001", "foo123", 1 << 20, 1, 10, 1, 576)]
+        [InlineData("mc://localhost:11002", "bar123", 1 << 20, 1, 100, 10, 1500)]
+        public async Task UdpReaderAndWriterCanCommunicateIfEncryptedWithPassPhrase(string uri, string passPhrase, int bufferSize, int ttl, int numAttempts, int burstSize, int mtu)
+        {
+            PassphraseEncoderFactory passPhraseEncoder = new PassphraseEncoderFactory(passPhrase, Encoding.UTF8);
+            UriParameters parms = new UriParameters(new Uri(uri));
+            MulticastSettings settings = new MulticastSettings(null, bufferSize, ttl);
+            MulticastServerSettings serverSettings = new MulticastServerSettings(false, mtu);
+            IUdpMulticastFactory factory = PortableTestUdpMulticast.CreateFactory(mtu);
+            using (UdpReader<FileSegment> reader = new UdpReader<FileSegment>(parms, settings, factory.CreateMulticast()))
+            using (UdpWriter writer = new UdpWriter(parms, settings, serverSettings, factory.CreateMulticast()))
+            {
+                try
+                {
+                    Random r = new Random();
+                    await writer.StartMulticastServer(0, passPhraseEncoder);
+                    await reader.JoinMulticastServer(new SessionJoinResponse { Ipv6 = false, Mtu = mtu, MulticastAddress = serverSettings.MulticastAddress, MulticastBurstLength = burstSize, MulticastPort = serverSettings.MulticastStartPort }, passPhraseEncoder);
+                    await MulticastLoopback(numAttempts, burstSize, mtu, reader, writer, r);
+                }
+                finally
+                {
+                    await reader.Close();
+                    await writer.Close();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("mc://localhost:11001", "foo123", "bar123", 1 << 20, 1, 10, 1, 576)]
+        [InlineData("mc://localhost:11002", "bar123", "foo123", 1 << 20, 1, 100, 10, 1500)]
+        public async Task UdpReaderAndWriterCantCommunicateIfPassphraseMismatched(string uri, string passPhrase1, string passPhrase2, int bufferSize, int ttl, int numAttempts, int burstSize, int mtu)
+        {
+            PassphraseEncoderFactory passPhraseEncoder1 = new PassphraseEncoderFactory(passPhrase1, Encoding.UTF8);
+            PassphraseEncoderFactory passPhraseEncoder2 = new PassphraseEncoderFactory(passPhrase2, Encoding.UTF8);
+            UriParameters parms = new UriParameters(new Uri(uri));
+            MulticastSettings settings = new MulticastSettings(null, bufferSize, ttl);
+            MulticastServerSettings serverSettings = new MulticastServerSettings(false, mtu);
+            IUdpMulticastFactory factory = PortableTestUdpMulticast.CreateFactory(mtu);
+            using (UdpReader<FileSegment> reader = new UdpReader<FileSegment>(parms, settings, factory.CreateMulticast()))
+            using (UdpWriter writer = new UdpWriter(parms, settings, serverSettings, factory.CreateMulticast()))
+            {
+                try
+                {
+                    Random r = new Random();
+                    await writer.StartMulticastServer(0, passPhraseEncoder1);
+                    await reader.JoinMulticastServer(new SessionJoinResponse { Ipv6 = false, Mtu = mtu, MulticastAddress = serverSettings.MulticastAddress, MulticastBurstLength = burstSize, MulticastPort = serverSettings.MulticastStartPort }, passPhraseEncoder2);
+                    try
+                    {
+                        await MulticastLoopback(numAttempts, burstSize, mtu, reader, writer, r);
+                        Assert.True(false);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+                finally
+                {
+                    await reader.Close();
+                    await writer.Close();
+                }
+            }
+        }
+
+        [Theory]
+        [InlineData("mc://localhost:11001", "foo123", 1 << 20, 1, 10, 1, 576)]
+        public async Task UdpReaderAndWriterCantCommunicateIfMissingPassphrase(string uri, string passPhrase1, int bufferSize, int ttl, int numAttempts, int burstSize, int mtu)
+        {
+            PassphraseEncoderFactory passPhraseEncoder1 = new PassphraseEncoderFactory(passPhrase1, Encoding.UTF8);
+            UriParameters parms = new UriParameters(new Uri(uri));
+            MulticastSettings settings = new MulticastSettings(null, bufferSize, ttl);
+            MulticastServerSettings serverSettings = new MulticastServerSettings(false, mtu);
+            IUdpMulticastFactory factory = PortableTestUdpMulticast.CreateFactory(mtu);
+            using (UdpReader<FileSegment> reader = new UdpReader<FileSegment>(parms, settings, factory.CreateMulticast()))
+            using (UdpWriter writer = new UdpWriter(parms, settings, serverSettings, factory.CreateMulticast()))
+            {
+                try
+                {
+                    Random r = new Random();
+                    await writer.StartMulticastServer(0, passPhraseEncoder1);
+                    await reader.JoinMulticastServer(new SessionJoinResponse { Ipv6 = false, Mtu = mtu, MulticastAddress = serverSettings.MulticastAddress, MulticastBurstLength = burstSize, MulticastPort = serverSettings.MulticastStartPort }, null);
+                    try
+                    {
+                        await MulticastLoopback(numAttempts, burstSize, mtu, reader, writer, r);
+                        Assert.True(false);
+                    }
+                    catch (Exception)
+                    {
+                    }
                 }
                 finally
                 {
@@ -74,7 +174,7 @@ namespace MS.MulticastDownloader.Tests.IO
                 List<FileSegment> inbound = new List<FileSegment>();
                 for (int j = 0; j < 100 && inbound.Count < outbound.Count; ++j)
                 {
-                    inbound.AddRange(await reader.ReceiveMulticast(Constants.ReadDelay, CancellationToken.None));
+                    inbound.AddRange(await reader.ReceiveMulticast(Constants.ReadDelay));
                 }
 
                 Assert.Equal(outbound.Count, inbound.Count);

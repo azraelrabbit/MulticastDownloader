@@ -105,56 +105,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\Tests.Portable\ClientServerTest.cs">
-      <Link>\ClientServerTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Cryptography\EncoderTest.cs">
-      <Link>Cryptography\\EncoderTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\IO\ChunkTest.cs">
-      <Link>IO\\ChunkTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\IO\FileSystemTest.cs">
-      <Link>IO\\FileSystemTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\IO\SessionTest.cs">
-      <Link>IO\\SessionTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\IO\UdpTest.cs">
-      <Link>IO\\UdpTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\obj\Debug\TemporaryGeneratedFile_036C0B5B-1481-4323-8D20-8F5ADCB23D92.cs">
-      <Link>obj\Debug\\TemporaryGeneratedFile_036C0B5B-1481-4323-8D20-8F5ADCB23D92.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\obj\Debug\TemporaryGeneratedFile_5937a670-0e60-4077-877b-f7221da3dda1.cs">
-      <Link>obj\Debug\\TemporaryGeneratedFile_5937a670-0e60-4077-877b-f7221da3dda1.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\obj\Debug\TemporaryGeneratedFile_E7A71F73-0F8D-4B9B-B56E-8E70B10BC5D3.cs">
-      <Link>obj\Debug\\TemporaryGeneratedFile_E7A71F73-0F8D-4B9B-B56E-8E70B10BC5D3.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\PortableTestUdpMulticast.cs">
-      <Link>\PortableTestUdpMulticast.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Properties\AssemblyInfo.cs">
-      <Link>Properties\\AssemblyInfo.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\SessionTest.cs">
-      <Link>\SessionTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Session\BitVectorTest.cs">
-      <Link>Session\\BitVectorTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Session\FileHeaderTest.cs">
-      <Link>Session\\FileHeaderTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Session\FileSetTest.cs">
-      <Link>Session\\FileSetTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\Session\ThroughputCalculatorTest.cs">
-      <Link>Session\\ThroughputCalculatorTest.cs</Link>
-    </Compile>
-    <Compile Include="..\Tests.Portable\TestOutputLoggerFactoryAdapter.cs">
-      <Link>\TestOutputLoggerFactoryAdapter.cs</Link>
+    <Compile Include="..\Tests.Portable\**\*.cs">
+      <Link>%(RecursiveDir)\%(Filename)%(Extension)</Link>
     </Compile>
   </ItemGroup>
   <ItemGroup>

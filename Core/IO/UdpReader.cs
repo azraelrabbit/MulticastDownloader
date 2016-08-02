@@ -28,6 +28,7 @@ namespace MS.MulticastDownloader.Core.IO
         private int bufferSize;
         private Task readTask;
         private CancellationTokenSource readCts = new CancellationTokenSource();
+        private AutoResetEvent jobAddedEvent = new AutoResetEvent(false);
         private ConcurrentQueue<DecodeJob> pendingDecodes = new ConcurrentQueue<DecodeJob>();
         private ConcurrentBag<IDecoder> decoders = new ConcurrentBag<IDecoder>();
         private bool disposed;
@@ -77,13 +78,9 @@ namespace MS.MulticastDownloader.Core.IO
             await this.multicastClient.Close();
         }
 
-        internal async Task<ICollection<T>> ReceiveMulticast(TimeSpan readDelay, CancellationToken token)
+        internal async Task<ICollection<T>> ReceiveMulticast(TimeSpan readDelay)
         {
-            if (this.pendingDecodes.IsEmpty)
-            {
-                await Task.Delay(readDelay, token);
-            }
-
+            this.jobAddedEvent.WaitOne(readDelay);
             int read = 0;
             int count = this.pendingDecodes.Count;
             List<T> ret = new List<T>(count);
@@ -118,6 +115,11 @@ namespace MS.MulticastDownloader.Core.IO
                     this.multicastClient.Dispose();
                 }
 
+                if (this.jobAddedEvent != null)
+                {
+                    this.jobAddedEvent.Dispose();
+                }
+
                 this.pendingDecodes = null;
             }
         }
@@ -136,6 +138,7 @@ namespace MS.MulticastDownloader.Core.IO
 
                     this.bufferUse += read.Length;
                     this.pendingDecodes.Enqueue(this.DecodeTask(read, token));
+                    this.jobAddedEvent.Set();
                 }
             });
 
