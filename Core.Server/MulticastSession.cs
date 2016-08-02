@@ -416,7 +416,7 @@ namespace MS.MulticastDownloader.Core.Server
                         await writeTask;
                     }
 
-                    writeTask = Task.WhenAll(this.writer.SendMulticast(sent, token), Task.Delay(this.Server.BurstDelayMs));
+                    writeTask = Task.WhenAll(this.writer.SendMulticast(sent), Task.Delay(this.Server.BurstDelayMs));
                 }
 
                 if (writeTask != null)

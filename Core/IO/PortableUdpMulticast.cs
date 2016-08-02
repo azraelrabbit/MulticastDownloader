@@ -26,6 +26,24 @@ namespace MS.MulticastDownloader.Core.IO
         private TaskCompletionSource<byte[]> readTcs = new TaskCompletionSource<byte[]>();
         private bool disposed;
 
+        private PortableUdpMulticast()
+        {
+        }
+
+        /// <summary>
+        /// Gets the <see cref="IUdpMulticast"/> factory.
+        /// </summary>
+        /// <value>
+        /// The factory.
+        /// </value>
+        public static IUdpMulticastFactory Factory
+        {
+            get
+            {
+                return new PortableUdpMulticastFactory();
+            }
+        }
+
         /// <summary>
         /// Closes this instance.
         /// </summary>
@@ -137,6 +155,20 @@ namespace MS.MulticastDownloader.Core.IO
                         this.multicastClient.Dispose();
                     }
                 }
+            }
+        }
+
+        private class PortableUdpMulticastFactory : IUdpMulticastFactory
+        {
+            /// <summary>
+            /// Creates the multicast server.
+            /// </summary>
+            /// <returns>
+            /// A multicast server.
+            /// </returns>
+            public IUdpMulticast CreateMulticast()
+            {
+                return new PortableUdpMulticast();
             }
         }
     }

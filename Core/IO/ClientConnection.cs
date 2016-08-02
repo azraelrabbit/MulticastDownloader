@@ -47,9 +47,9 @@ namespace MS.MulticastDownloader.Core.IO
             this.TlsStream = tlsClient.Stream;
         }
 
-        internal async Task<UdpReader> JoinMulticastServer(IUdpMulticast udpMulticast, SessionJoinResponse response, IEncoderFactory encoder)
+        internal async Task<UdpReader<FileSegment>> JoinMulticastServer(IUdpMulticast udpMulticast, SessionJoinResponse response, IEncoderFactory encoder)
         {
-            UdpReader reader = new UdpReader(this.UriParameters, this.Settings, udpMulticast);
+            UdpReader<FileSegment> reader = new UdpReader<FileSegment>(this.UriParameters, this.Settings, udpMulticast);
             await reader.JoinMulticastServer(response, encoder);
             return reader;
         }

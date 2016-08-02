@@ -24,7 +24,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
     internal class UdpWriter : ServerConnectionBase
     {
         private ILog log = LogManager.GetLogger<UdpWriter>();
-        private IEncoderFactory encoder;
+        private IEncoderFactory encoderFactory;
         private IUdpMulticast multicastClient;
         private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool disposed;
@@ -73,7 +73,7 @@ namespace MS.MulticastDownloader.Core.Server.IO
             this.BlockSize = SessionJoinResponse.GetBlockSize(this.ServerSettings.Mtu, this.Ipv6);
             if (encoderFactory != null)
             {
-                this.encoder = encoderFactory;
+                this.encoderFactory = encoderFactory;
                 IEncoder encoder = encoderFactory.CreateEncoder();
                 int unencodedSize = this.BlockSize;
                 while (encoder.GetEncodedOutputLength(unencodedSize) > this.BlockSize)
@@ -105,37 +105,34 @@ namespace MS.MulticastDownloader.Core.Server.IO
             await this.multicastClient.Close();
         }
 
-        internal async Task SendMulticast<T>(IEnumerable<T> data, CancellationToken token)
+        internal async Task SendMulticast<T>(IEnumerable<T> data)
         {
             Contract.Requires(data != null);
-            Task t0 = Task.Run(() =>
+            IEnumerable<Task> t0 = data.Select(async (val) =>
             {
-                IEncoderFactory encoderFactory = this.encoder;
-                data.AsParallel().ForAll(async (val) =>
+                using (MemoryStream ms = new MemoryStream(this.BlockSize))
                 {
-                    byte[] serialized = new byte[this.BlockSize];
-                    using (MemoryStream ms = new MemoryStream(serialized, true))
-                    {
-                        Serializer.Serialize(ms, val);
-                    }
-
-                    if (encoderFactory != null)
+                    Serializer.Serialize(ms, val);
+                    byte[] serialized = new byte[ms.Position];
+                    Array.Copy(ms.ToArray(), serialized, serialized.Length);
+                    if (this.encoderFactory != null)
                     {
                         IEncoder encoder;
                         if (!this.encoders.TryTake(out encoder))
                         {
-                            encoder = encoderFactory.CreateEncoder();
+                            encoder = this.encoderFactory.CreateEncoder();
                         }
 
                         serialized = encoder.Encode(serialized);
                         this.encoders.Add(encoder);
                     }
 
+                    Contract.Assert(serialized.Length <= this.ServerSettings.Mtu);
                     await this.multicastClient.Send(serialized);
-                });
+                }
             });
 
-            await t0.WaitWithCancellation(token);
+            await Task.WhenAll(t0);
         }
 
         /// <summary>

@@ -175,7 +175,7 @@ namespace MS.MulticastDownloader.Commands
                 this.encoderFactory = await AsymmetricEncoderFactory.Load(FileSystem.Current.LocalStorage, this.publicKey, AsymmetricSecretFlags.None);
             }
 
-            using (MulticastClient client = new MulticastClient(new PortableUdpMulticast(), this.Uri, this))
+            using (MulticastClient client = new MulticastClient(this.Uri, this))
             {
                 Task transferTask = client.StartTransfer(this.Token);
                 if (this.DisplayUiStatus)

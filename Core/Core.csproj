@@ -74,6 +74,7 @@
     <Compile Include="IO\ChunkWriter.cs" />
     <Compile Include="IO\ClientConnection.cs" />
     <Compile Include="IO\IUdpMulticast.cs" />
+    <Compile Include="IO\IUdpMulticastFactory.cs" />
     <Compile Include="IO\PortableUdpMulticast.cs" />
     <Compile Include="IO\UdpReader.cs" />
     <Compile Include="IO\ConnectionBase.cs" />

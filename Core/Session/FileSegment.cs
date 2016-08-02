@@ -4,16 +4,38 @@
 
 namespace MS.MulticastDownloader.Core.Session
 {
+    using System;
+    using System.Linq;
     using ProtoBuf;
 
     [ProtoContract]
-    internal class FileSegment
+    internal class FileSegment : IEquatable<FileSegment>
     {
         [ProtoMember(1)]
         internal long SegmentId { get; set; }
 
         [ProtoMember(2)]
         internal byte[] Data { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is FileSegment)
+            {
+                return this.Equals(obj as FileSegment);
+            }
+
+            return base.Equals(obj);
+        }
+
+        public bool Equals(FileSegment other)
+        {
+            return this.SegmentId == other.SegmentId && (this.Data == other.Data || this.Data != null ? this.Data.SequenceEqual(other.Data) : false);
+        }
+
+        public override int GetHashCode()
+        {
+            return this.SegmentId.GetHashCode() + (this.Data != null ? this.Data.Sum((b) => b) : 0);
+        }
 
         // See https://developers.google.com/protocol-buffers/docs/encoding#non-varint-numbers
 

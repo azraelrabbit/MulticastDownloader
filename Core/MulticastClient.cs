@@ -33,8 +33,8 @@ namespace MS.MulticastDownloader.Core
         private BitVector written;
         private ClientConnection cliConn;
         private ChunkWriter writer;
-        private IUdpMulticast udpMulticast;
-        private UdpReader udpReader;
+        private IUdpMulticastFactory udpMulticast;
+        private UdpReader<FileSegment> udpReader;
         private BoxedLong seqNum;
         private BoxedLong waveNum;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
@@ -49,11 +49,34 @@ namespace MS.MulticastDownloader.Core
         /// <summary>
         /// Initializes a new instance of the <see cref="MulticastClient"/> class.
         /// </summary>
-        /// <param name="udpMulticast">The <see cref="IUdpMulticast"/> implementation.</param>
         /// <param name="path">The path.</param>
         /// <param name="settings">The settings.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastClient(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings)
+        public MulticastClient(Uri path, IMulticastSettings settings)
+            : this(PortableUdpMulticast.Factory, path, settings)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
+        /// </summary>
+        /// <param name="path">The path.</param>
+        /// <param name="settings">The settings.</param>
+        /// <param name="state">The application-defined state.</param>
+        /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
+        public MulticastClient(Uri path, IMulticastSettings settings, int state)
+            : this(PortableUdpMulticast.Factory, path, settings, state)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MulticastClient"/> class.
+        /// </summary>
+        /// <param name="udpMulticast">The <see cref="IUdpMulticastFactory"/> implementation.</param>
+        /// <param name="path">The path.</param>
+        /// <param name="settings">The settings.</param>
+        /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
+        public MulticastClient(IUdpMulticastFactory udpMulticast, Uri path, IMulticastSettings settings)
             : this(udpMulticast, path, settings, 0)
         {
         }
@@ -66,8 +89,13 @@ namespace MS.MulticastDownloader.Core
         /// <param name="settings">The settings.</param>
         /// <param name="state">The application-defined state.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastClient(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings, int state)
+        public MulticastClient(IUdpMulticastFactory udpMulticast, Uri path, IMulticastSettings settings, int state)
         {
+            if (udpMulticast == null)
+            {
+                throw new ArgumentNullException("udpMulticast");
+            }
+
             if (settings == null)
             {
                 throw new ArgumentNullException("settings");
@@ -448,13 +476,13 @@ namespace MS.MulticastDownloader.Core
         {
             try
             {
-                this.udpReader = await this.cliConn.JoinMulticastServer(this.udpMulticast, response, this.fileEncoder);
+                this.udpReader = await this.cliConn.JoinMulticastServer(this.udpMulticast.CreateMulticast(), response, this.fileEncoder);
                 this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
                 this.log.Info("Waiting for multicast payload");
                 Task statusTask = this.UpdateStatus();
                 while (!this.complete)
                 {
-                    ICollection<FileSegment> received = await this.udpReader.ReceiveMulticast<FileSegment>(this.token);
+                    ICollection<FileSegment> received = await this.udpReader.ReceiveMulticast(Constants.ReadDelay, this.token);
                     FileSegment last = received.LastOrDefault();
                     if (last != null)
                     {

@@ -49,7 +49,7 @@ namespace MS.MulticastDownloader.Core.Server
         private MulticastSession activeSession;
         private AutoResetEvent joinEvent = new AutoResetEvent(false);
         private ServerListener listener;
-        private IUdpMulticast udpMulticast;
+        private IUdpMulticastFactory udpMulticast;
         private HashEncoderFactory encoderFactory;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
         private CancellationToken token = CancellationToken.None;
@@ -60,13 +60,30 @@ namespace MS.MulticastDownloader.Core.Server
         /// <summary>
         /// Initializes a new instance of the <see cref="MulticastServer"/> class.
         /// </summary>
-        /// <param name="udpMulticast">The <see cref="IUdpMulticast"/> implementation.</param>
+        /// <param name="path">The path.</param>
+        /// <param name="settings">The settings.</param>
+        /// <param name="serverSettings">The server settings.</param>
+        /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
+        public MulticastServer(Uri path, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+            : this(PortableUdpMulticast.Factory, path, settings, serverSettings)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MulticastServer"/> class.
+        /// </summary>
+        /// <param name="udpMulticast">The <see cref="IUdpMulticastFactory"/> implementation.</param>
         /// <param name="path">The server path.</param>
         /// <param name="settings">The settings.</param>
         /// <param name="serverSettings">The server settings.</param>
         /// <remarks>For examples of possible multicast URIs, see the <see cref="UriParameters"/> class.</remarks>
-        public MulticastServer(IUdpMulticast udpMulticast, Uri path, IMulticastSettings settings, IMulticastServerSettings serverSettings)
+        public MulticastServer(IUdpMulticastFactory udpMulticast, Uri path, IMulticastSettings settings, IMulticastServerSettings serverSettings)
         {
+            if (udpMulticast == null)
+            {
+                throw new ArgumentNullException("udpMulticast");
+            }
+
             if (settings == null)
             {
                 throw new ArgumentNullException("settings");
@@ -613,7 +630,7 @@ namespace MS.MulticastDownloader.Core.Server
                 if (!usedSessions.Contains(i))
                 {
                     MulticastSession newSession = new MulticastSession(this, key, i);
-                    UdpWriter writer = await this.listener.CreateWriter(this.udpMulticast, i, this.encoderFactory);
+                    UdpWriter writer = await this.listener.CreateWriter(this.udpMulticast.CreateMulticast(), i, this.encoderFactory);
                     await newSession.StartSession(writer, this.token);
                     lock (this.sessionLock)
                     {

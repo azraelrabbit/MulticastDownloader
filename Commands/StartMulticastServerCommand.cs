@@ -343,7 +343,7 @@ namespace MS.MulticastDownloader.Commands
                 this.log.Warn("NativeMethods.timeEndPeriod(1) ret=" + timerRet);
             }
 
-            using (MulticastServer server = new MulticastServer(new PortableUdpMulticast(), this.Uri, this, this))
+            using (MulticastServer server = new MulticastServer(this.Uri, this, this))
             {
                 Task hostTask = server.Listen(this.Token);
                 while (!hostTask.IsCompleted && !hostTask.IsCanceled && !hostTask.IsFaulted)
