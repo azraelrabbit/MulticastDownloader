@@ -30,27 +30,33 @@ namespace MS.MulticastDownloader.Tests
         }
 
         [Theory]
-        [InlineData(1 << 20, 60, long.MaxValue, new long[] { 1234 }, 1500, 1)]
-        [InlineData(1 << 20, 60, 300, new long[] { 1234, 150000, 150000, 15000000 }, 1500, 50)]
-        [InlineData(1 << 20, 60, 300000, new long[] { 1000 << 20, 500 << 20 }, 1500, 50)]
-        public async Task ClientDownloadsFolderFromServerNoCrypto(int bufferSize, long maxBytesPerSecond, int readTimeout, long[] fileSizes, int mtu, double packetReception)
+        [InlineData(1, 1 << 20, long.MaxValue, 30, new long[] { 1234 }, 1500, 1)]
+        [InlineData(5, 1 << 20, long.MaxValue, 30, new long[] { 1234 }, 1500, 1)]
+        [InlineData(1, 1 << 20, 10 << 20, 300, new long[] { 1234, 150000, 150000, 15000000 }, 1500, .8)]
+        //[InlineData(1, 1 << 20, 400 << 20, 300000, new long[] { 1000 << 20, 500 << 20 }, 1500, .5)]
+        public async Task ClientDownloadsFolderFromServerNoCrypto(int numIterations, int bufferSize, long maxBytesPerSecond, int readTimeout, long[] fileSizes, int mtu, double packetReception)
         {
-            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in", fileSizes);
-            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting);
+            string ins = "in" + Guid.NewGuid().ToString().Replace("-", string.Empty);
+            string outs = "out" + Guid.NewGuid().ToString().Replace("-", string.Empty);
+            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in2", fileSizes);
+            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out2", CreationCollisionOption.ReplaceExisting);
             MulticastSettings serverSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
             MulticastSettings clientSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
             MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
+            IUdpMulticastFactory multicastFactory = PortableTestUdpMulticast.CreateFactory(mtu, packetReception);
             using (CancellationTokenSource cts = new CancellationTokenSource())
-            using (MulticastServer server = new MulticastServer(new Uri("mc://localhost"), serverSettings, serverMulticastSettings))
+            using (MulticastServer server = new MulticastServer(multicastFactory, new Uri("mc://localhost:801"), serverSettings, serverMulticastSettings))
             {
                 CancellationToken token = cts.Token;
                 try
                 {
                     Task listenTask = server.Listen(token);
-                    using (MulticastClient client = new MulticastClient(new Uri("mc://localhost"), clientSettings))
+                    for (int i = 0; i < numIterations; ++i)
                     {
-                        await client.StartTransfer(token);
-                        await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, "in", "out");
+                        using (MulticastClient client = new MulticastClient(multicastFactory, new Uri("mc://localhost:801"), clientSettings))
+                        {
+                            await client.StartTransfer(token);
+                        }
                     }
 
                     cts.Cancel();
@@ -67,88 +73,88 @@ namespace MS.MulticastDownloader.Tests
                     await server.Close();
                 }
             }
+
+            await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, "in2", "out2");
         }
 
-        [Theory]
-        [InlineData(1 << 20, 60, long.MaxValue, 1234, 1500, 1)]
-        [InlineData(1 << 20, 60, 300, 15000000, 1500, 50)]
-        [InlineData(1 << 20, 60, 300000, 1000 << 20, 1500, 50)]
-        public async Task ClientDownloadsFileFromServerNoCrypto(int bufferSize, long maxBytesPerSecond, int readTimeout, long fileSize, int mtu, double packetReception)
-        {
-            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in", new long[] { fileSize });
-            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting);
-            MulticastSettings serverSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
-            MulticastSettings clientSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
-            MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
-            using (CancellationTokenSource cts = new CancellationTokenSource())
-            using (MulticastServer server = new MulticastServer(new Uri("mc://localhost"), serverSettings, serverMulticastSettings))
-            {
-                CancellationToken token = cts.Token;
-                try
-                {
-                    Task listenTask = server.Listen(token);
-                    using (MulticastClient client = new MulticastClient(new Uri("mc://localhost/test1"), clientSettings))
-                    {
-                        await client.StartTransfer(token);
-                        await CompareTestPayloadFiles(FileSystem.Current.LocalStorage, "in\\test1", "out\\test1");
-                    }
+        //[Theory]
+        //[InlineData(1 << 20, long.MaxValue, 300, 15000000, 1500, .5)]
+        //public async Task ClientDownloadsFileFromServerNoCrypto(int bufferSize, long maxBytesPerSecond, int readTimeout, long fileSize, int mtu, double packetReception)
+        //{
+        //    IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in2", new long[] { fileSize });
+        //    IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out2", CreationCollisionOption.ReplaceExisting);
+        //    MulticastSettings serverSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
+        //    MulticastSettings clientSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
+        //    MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
+        //    IUdpMulticastFactory multicastFactory = PortableTestUdpMulticast.CreateFactory(mtu, packetReception);
+        //    using (CancellationTokenSource cts = new CancellationTokenSource())
+        //    using (MulticastServer server = new MulticastServer(multicastFactory, new Uri("mc://localhost"), serverSettings, serverMulticastSettings))
+        //    {
+        //        CancellationToken token = cts.Token;
+        //        try
+        //        {
+        //            Task listenTask = server.Listen(token);
+        //            using (MulticastClient client = new MulticastClient(multicastFactory, new Uri("mc://localhost/test1"), clientSettings))
+        //            {
+        //                await client.StartTransfer(token);
+        //            }
 
-                    cts.Cancel();
-                    try
-                    {
-                        await listenTask;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                }
-                finally
-                {
-                    await server.Close();
-                }
-            }
-        }
+        //            cts.Cancel();
+        //            try
+        //            {
+        //                await listenTask;
+        //            }
+        //            catch (OperationCanceledException)
+        //            {
+        //            }
+        //        }
+        //        finally
+        //        {
+        //            await server.Close();
+        //        }
+        //    }
+        //    await CompareTestPayloadFiles(FileSystem.Current.LocalStorage, "in2\\test1", "out2\\test1");
+        //}
 
-        [Theory]
-        [InlineData("foobar", 1 << 20, 60, long.MaxValue, new long[] { 1234 }, 1500, 1)]
-        [InlineData("foobar", 1 << 20, 60, 300, new long[] { 1234, 150000, 150000, 15000000 }, 1500, 50)]
-        [InlineData("foobar", 1 << 20, 60, 300000, new long[] { 1000 << 20, 500 << 20 }, 1500, 50)]
-        public async Task ClientDownloadsFolderFromServerCrypto(string passPhrase, int bufferSize, long maxBytesPerSecond, int readTimeout, long[] fileSizes, int mtu, double packetReception)
-        {
-            PassphraseEncoderFactory encoder = new PassphraseEncoderFactory(passPhrase, Encoding.Unicode);
-            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in", fileSizes);
-            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting);
-            MulticastSettings serverSettings = new MulticastSettings(encoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
-            MulticastSettings clientSettings = new MulticastSettings(encoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
-            MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
-            using (CancellationTokenSource cts = new CancellationTokenSource())
-            using (MulticastServer server = new MulticastServer(new Uri("mc://localhost"), serverSettings, serverMulticastSettings))
-            {
-                CancellationToken token = cts.Token;
-                try
-                {
-                    Task listenTask = server.Listen(token);
-                    using (MulticastClient client = new MulticastClient(new Uri("mc://localhost"), clientSettings))
-                    {
-                        await client.StartTransfer(token);
-                        await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, "in", "out");
-                    }
+        //[Theory]
+        //[InlineData("foobar", 1 << 20, long.MaxValue, 300, new long[] { 1234, 150000, 150000, 15000000 }, 1500, .5)]
+        //public async Task ClientDownloadsFolderFromServerCrypto(string passPhrase, int bufferSize, long maxBytesPerSecond, int readTimeout, long[] fileSizes, int mtu, double packetReception)
+        //{
+        //    PassphraseEncoderFactory encoder = new PassphraseEncoderFactory(passPhrase, Encoding.Unicode);
+        //    IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in2", fileSizes);
+        //    IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out2", CreationCollisionOption.ReplaceExisting);
+        //    MulticastSettings serverSettings = new MulticastSettings(encoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
+        //    MulticastSettings clientSettings = new MulticastSettings(encoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
+        //    MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
+        //    IUdpMulticastFactory multicastFactory = PortableTestUdpMulticast.CreateFactory(mtu, packetReception);
+        //    using (CancellationTokenSource cts = new CancellationTokenSource())
+        //    using (MulticastServer server = new MulticastServer(multicastFactory, new Uri("mc://localhost"), serverSettings, serverMulticastSettings))
+        //    {
+        //        CancellationToken token = cts.Token;
+        //        try
+        //        {
+        //            Task listenTask = server.Listen(token);
+        //            using (MulticastClient client = new MulticastClient(multicastFactory, new Uri("mc://localhost"), clientSettings))
+        //            {
+        //                await client.StartTransfer(token);
+        //            }
 
-                    cts.Cancel();
-                    try
-                    {
-                        await listenTask;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                }
-                finally
-                {
-                    await server.Close();
-                }
-            }
-        }
+        //            cts.Cancel();
+        //            try
+        //            {
+        //                await listenTask;
+        //            }
+        //            catch (OperationCanceledException)
+        //            {
+        //            }
+        //        }
+        //        finally
+        //        {
+        //            await server.Close();
+        //        }
+        //    }
+        //    await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, "in2", "out2");
+        //}
 
         private static async Task CompareTestPayloadFolders(IFolder folder, string folder1, string folder2)
         {

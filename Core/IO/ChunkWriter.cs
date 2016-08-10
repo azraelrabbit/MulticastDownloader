@@ -23,6 +23,37 @@ namespace MS.MulticastDownloader.Core.IO
             this.written = written;
         }
 
+        internal long TotalBytes
+        {
+            get
+            {
+                long bytes = 0;
+                foreach (FileChunk chunk in this.Chunks)
+                {
+                    bytes += chunk.Block.Length;
+                }
+
+                return bytes;
+            }
+        }
+
+        internal long BytesRemaining
+        {
+            get
+            {
+                long bytes = 0;
+                foreach (FileChunk chunk in this.Chunks)
+                {
+                    if (!this.written[chunk.Block.SegmentId])
+                    {
+                        bytes += chunk.Block.Length;
+                    }
+                }
+
+                return bytes;
+            }
+        }
+
         internal BitVector Written
         {
             get
@@ -34,36 +65,28 @@ namespace MS.MulticastDownloader.Core.IO
         internal async Task WriteSegments(IEnumerable<FileSegment> segments)
         {
             Contract.Requires(segments != null);
-            Task lastWrite = null;
+            Task lastWrite = Task.Run(() => { });
             long lastSegment = long.MinValue;
             foreach (FileSegment segment in segments)
             {
                 Contract.Requires(segment.SegmentId >= 0 && segment.SegmentId < this.Count);
                 if (!this.written[segment.SegmentId])
                 {
+                    this.written[segment.SegmentId] = true;
                     FileChunk chunk = this.Chunks[segment.SegmentId];
                     Contract.Assert(segment.Data.Length == chunk.Block.Length);
-                    if (lastWrite != null)
-                    {
-                        await lastWrite;
-                        this.written[lastSegment] = true;
-                    }
-
                     if (chunk.Stream.Position != chunk.Block.Offset)
                     {
-                        await Task.Run(() => chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin));
+                        chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin);
                     }
 
                     lastSegment = segment.SegmentId;
+                    await lastWrite;
                     lastWrite = chunk.Stream.WriteAsync(segment.Data, 0, segment.Data.Length);
                 }
             }
 
-            if (lastWrite != null)
-            {
-                await lastWrite;
-                this.written[lastSegment] = true;
-            }
+            await lastWrite;
         }
     }
 }

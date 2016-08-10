@@ -11,7 +11,7 @@ namespace MS.MulticastDownloader.Core.Session
     internal class WaveStatusUpdate : PacketStatusUpdate
     {
         // The bit-vector mask of file sequences id's that the client has.
-        [ProtoMember(1)]
+        [ProtoMember(11)]
         internal byte[] FileBitVector { get; set; }
     }
 }

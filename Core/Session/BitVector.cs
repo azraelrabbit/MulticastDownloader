@@ -137,10 +137,15 @@ namespace MS.MulticastDownloader.Core.Session
         /// <returns>A <see cref="BitVector"/> containing the union of all sub-vector values.</returns>
         public static BitVector IntersectOf(ICollection<BitVector> vectors)
         {
-            BitVector first = vectors.FirstOrDefault();
-            if (vectors == null || first == null)
+            if (vectors == null)
             {
-                throw new ArgumentException("vectors");
+                throw new ArgumentNullException("vectors");
+            }
+
+            BitVector first = vectors.FirstOrDefault();
+            if (first == null)
+            {
+                return new BitVector(0);
             }
 
             long countBits = first.RawBits.LongCount();

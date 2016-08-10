@@ -97,18 +97,18 @@ namespace MS.MulticastDownloader.Core.Session
 
         internal IEnumerable<FileChunk> EnumerateChunks()
         {
-            for (int i = 0; i < this.headers.Count; ++i)
+            int i = 0;
+            foreach (FileHeader header in this.headers)
             {
-                foreach (FileHeader header in this.headers)
+                if (header.Blocks != null)
                 {
-                    if (header.Blocks != null)
+                    foreach (FileBlockRange fbr in header.Blocks)
                     {
-                        foreach (FileBlockRange fbr in header.Blocks)
-                        {
-                            yield return new FileChunk(this.streamsByHeaderIndex[i], header, fbr);
-                        }
+                        yield return new FileChunk(this.streamsByHeaderIndex[i], header, fbr);
                     }
                 }
+
+                ++i;
             }
         }
 

@@ -267,5 +267,14 @@ namespace MS.MulticastDownloader.Core.Properties {
                 return ResourceManager.GetString("StringCannotBeNullOrEmpty", resourceCulture);
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Wave status update failed..
+        /// </summary>
+        internal static string WaveStatusUpdateFailed {
+            get {
+                return ResourceManager.GetString("WaveStatusUpdateFailed", resourceCulture);
+            }
+        }
     }
 }

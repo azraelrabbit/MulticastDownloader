@@ -40,7 +40,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/in"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -51,7 +51,7 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.Null(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.Equal(null, server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -93,7 +93,7 @@ namespace MS.MulticastDownloader.Tests
             {
                 try
                 {
-                    Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                    Task serverTask = ListenTask(server, cts.Token);
 
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
                     {
@@ -103,7 +103,7 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -143,7 +143,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -154,7 +154,7 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -192,7 +192,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -203,7 +203,7 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(0, server.BytesRemaining);
+                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -242,7 +242,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_pub.rsa", AsymmetricSecretFlags.None, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -290,7 +290,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/"), new MulticastSettings(passphraseEncoder1, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder2, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -339,7 +339,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(passphraseEncoder, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -388,7 +388,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri("mcs://localhost/in"), new MulticastSettings(await AsymmetricEncoderFactory.Load(folder, "client_priv.rsa", AsymmetricSecretFlags.ReadPrivateKey, null), bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -434,7 +434,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     using (MulticastClient client = new MulticastClient(PortableTestUdpMulticast.CreateFactory(), new Uri(uri), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, await folder.CreateFolderAsync("out", CreationCollisionOption.ReplaceExisting))))
@@ -482,7 +482,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     List<MulticastClient> clients = new List<MulticastClient>();
@@ -549,7 +549,7 @@ namespace MS.MulticastDownloader.Tests
             using (MulticastServer server = new MulticastServer(PortableTestUdpMulticast.CreateFactory(), new Uri("mc://localhost/"), new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, folder), serverSettings))
             using (CancellationTokenSource cts = new CancellationTokenSource())
             {
-                Task serverTask = server.AcceptAndJoinClients(cts.Token);
+                Task serverTask = ListenTask(server, cts.Token);
                 try
                 {
                     List<MulticastClient> clients = new List<MulticastClient>();
@@ -598,6 +598,16 @@ namespace MS.MulticastDownloader.Tests
                 {
                     await server.Close();
                 }
+            }
+        }
+
+        private static async Task ListenTask(MulticastServer server, CancellationToken token)
+        {
+            await server.AcceptAndJoinClients(true, token);
+            for (; ;)
+            {
+                await Task.Delay(1000, token);
+                await server.AcceptAndJoinClients(false, token);
             }
         }
 

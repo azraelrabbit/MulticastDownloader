@@ -186,4 +186,7 @@
   <data name="StringCannotBeNullOrEmpty" xml:space="preserve">
     <value>String cannot be null or empty.</value>
   </data>
+  <data name="WaveStatusUpdateFailed" xml:space="preserve">
+    <value>Wave status update failed.</value>
+  </data>
 </root>

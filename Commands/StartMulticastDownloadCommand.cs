@@ -15,6 +15,7 @@ namespace MS.MulticastDownloader.Commands
     using Core;
     using Core.Cryptography;
     using Core.IO;
+    using Microsoft.WindowsAPICodePack.Shell;
     using PCLStorage;
     using Properties;
     using Status;
@@ -33,6 +34,22 @@ namespace MS.MulticastDownloader.Commands
         private IEncoderFactory encoderFactory;
         private string passPhrase;
         private string publicKey;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StartMulticastDownloadCommand"/> class.
+        /// </summary>
+        public StartMulticastDownloadCommand()
+        {
+            try
+            {
+                this.DestinationPath = KnownFolders.Downloads.Path;
+            }
+            catch (TypeInitializationException)
+            {
+                // Some designer-type tools might not have access to this library...
+                this.DestinationPath = Path.GetTempPath();
+            }
+        }
 
         /// <summary>
         /// Gets the encoder used for encoding data and authorizing clients.
@@ -122,7 +139,7 @@ namespace MS.MulticastDownloader.Commands
         /// <value>
         /// The root.
         /// </value>
-        [Parameter(Mandatory = true, HelpMessage = "The destination path")]
+        [Parameter(HelpMessage = "The destination path")]
         public string DestinationPath
         {
             get

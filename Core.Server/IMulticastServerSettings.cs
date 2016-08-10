@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Core.Server
 {
+    using System;
     using Org.BouncyCastle.OpenSsl;
     using Org.BouncyCastle.X509;
     using PCLStorage;

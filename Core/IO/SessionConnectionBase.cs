@@ -72,30 +72,25 @@ namespace MS.MulticastDownloader.Core.IO
             }
         }
 
-        internal async Task Send<T>(T data, CancellationToken token)
+        internal void Send<T>(T data, CancellationToken token)
             where T : class
         {
             Contract.Requires(this.TcpSession != null);
             Contract.Requires(data != null);
-            Task<bool> t0 = Task.Run(() =>
+            using (CancellationTokenRegistration ctr = token.Register(() => this.outStream.Dispose()))
             {
-                Serializer.SerializeWithLengthPrefix(this.outStream, data, PrefixStyle.Fixed32);
-                return true;
-            });
-
-            await t0.WaitWithCancellation(token);
+                Serializer.SerializeWithLengthPrefix(this.outStream, data, PrefixStyle.Base128);
+            }
         }
 
-        internal async Task<T> Receive<T>(CancellationToken token)
+        internal T Receive<T>(CancellationToken token)
             where T : class
         {
             Contract.Requires(this.TcpSession != null);
-            Task<T> t0 = Task.Run(() =>
+            using (CancellationTokenRegistration ctr = token.Register(() => this.inStream.Dispose()))
             {
-                return Serializer.DeserializeWithLengthPrefix<T>(this.inStream, PrefixStyle.Fixed32);
-            });
-
-            return await t0.WaitWithCancellation(token);
+                return Serializer.DeserializeWithLengthPrefix<T>(this.inStream, PrefixStyle.Base128);
+            }
         }
 
         internal void SetTcpSession(ITcpSocketClient client)
@@ -104,7 +99,6 @@ namespace MS.MulticastDownloader.Core.IO
             this.tcpListen = true;
             this.TcpSession = client;
             this.TcpSession.ReadStream.ReadTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
-            this.TcpSession.WriteStream.WriteTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
             this.outStream = this.TcpSession.ReadStream;
             this.inStream = this.TcpSession.WriteStream;
         }

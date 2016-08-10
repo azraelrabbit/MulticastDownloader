@@ -27,7 +27,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
     {
         private ILog log = LogManager.GetLogger<ServerListener>();
         private TcpSocketListener listener = new TcpSocketListener();
-        private AutoResetEvent clientConnectedEvent = new AutoResetEvent(false);
         private ConcurrentQueue<ServerConnection> connections = new ConcurrentQueue<ServerConnection>();
         private bool tcpListen;
         private bool disposed;
@@ -71,24 +70,18 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
-        internal async Task<ICollection<ServerConnection>> ReceiveConnections(CancellationToken token)
+        internal ICollection<ServerConnection> ReceiveConnections(CancellationToken token)
         {
-            Task<List<ServerConnection>> t0 = Task.Run(() =>
+            List<ServerConnection> ret = new List<ServerConnection>();
+            ServerConnection conn;
+            while (this.connections.TryDequeue(out conn))
             {
-                this.clientConnectedEvent.WaitOne(1000);
-                List<ServerConnection> ret = new List<ServerConnection>();
-                ServerConnection conn;
-                while (this.connections.TryDequeue(out conn))
-                {
-                    token.ThrowIfCancellationRequested();
-                    this.log.DebugFormat("Accepting connection from {0}:{1}", conn.TcpSession.RemoteAddress, conn.TcpSession.RemotePort);
-                    ret.Add(conn);
-                }
+                token.ThrowIfCancellationRequested();
+                this.log.DebugFormat("Accepting connection from {0}:{1}", conn.TcpSession.RemoteAddress, conn.TcpSession.RemotePort);
+                ret.Add(conn);
+            }
 
-                return ret;
-            });
-
-            return await t0.WaitWithCancellation(token);
+            return ret;
         }
 
         /// <summary>
@@ -105,18 +98,12 @@ namespace MS.MulticastDownloader.Core.Server.IO
                 this.disposed = true;
                 if (disposing)
                 {
-                    if (this.clientConnectedEvent != null)
-                    {
-                        this.clientConnectedEvent.Dispose();
-                    }
-
                     ServerConnection conn;
                     while (this.connections.TryDequeue(out conn))
                     {
                         conn.Dispose();
                     }
 
-                    this.connections = null;
                     this.listener = null;
                 }
             }
@@ -127,7 +114,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
             ITcpSocketClient client = eventArgs.SocketClient;
             ServerConnection conn = new ServerConnection(this.UriParameters, this.Settings);
             conn.SetTcpSession(client);
-            this.clientConnectedEvent.Set();
             this.connections.Enqueue(conn);
         }
     }

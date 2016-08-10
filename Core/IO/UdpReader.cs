@@ -124,25 +124,20 @@ namespace MS.MulticastDownloader.Core.IO
             }
         }
 
-        private Task ReadTask(CancellationToken token)
+        private async Task ReadTask(CancellationToken token)
         {
-            Task t0 = Task.Run(async () =>
+            for (; ;)
             {
-                for (; ;)
+                byte[] read = await this.multicastClient.Receive();
+                if (this.bufferUse + read.Length > this.bufferSize * 8 / 10)
                 {
-                    byte[] read = await this.multicastClient.Receive();
-                    if (this.bufferUse + read.Length > this.bufferSize * 8 / 10)
-                    {
-                        continue;
-                    }
-
-                    this.bufferUse += read.Length;
-                    this.pendingDecodes.Enqueue(this.DecodeTask(read, token));
-                    this.jobAddedEvent.Set();
+                    continue;
                 }
-            });
 
-            return t0.WaitWithCancellation(token);
+                this.bufferUse += read.Length;
+                this.pendingDecodes.Enqueue(this.DecodeTask(read, token));
+                this.jobAddedEvent.Set();
+            }
         }
 
         private DecodeJob DecodeTask(byte[] data, CancellationToken token)

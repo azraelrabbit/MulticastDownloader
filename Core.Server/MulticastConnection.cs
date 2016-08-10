@@ -77,15 +77,8 @@ namespace MS.MulticastDownloader.Core.Server
         /// </value>
         public string RemoteAddress
         {
-            get
-            {
-                if (this.ServerConnection != null)
-                {
-                    return this.ServerConnection.TcpSession.RemoteAddress;
-                }
-
-                return null;
-            }
+            get;
+            private set;
         }
 
         /// <summary>
@@ -96,15 +89,8 @@ namespace MS.MulticastDownloader.Core.Server
         /// </value>
         public int RemotePort
         {
-            get
-            {
-                if (this.ServerConnection != null)
-                {
-                    return this.ServerConnection.TcpSession.RemotePort;
-                }
-
-                return int.MinValue;
-            }
+            get;
+            private set;
         }
 
         /// <summary>
@@ -267,7 +253,7 @@ namespace MS.MulticastDownloader.Core.Server
         internal bool LeavingSession
         {
             get;
-            private set;
+            set;
         }
 
         /// <summary>
@@ -302,7 +288,7 @@ namespace MS.MulticastDownloader.Core.Server
                     && this.RemotePort == other.RemotePort;
             }
 
-            return this != other;
+            return this == other;
         }
 
         /// <summary>
@@ -327,8 +313,11 @@ namespace MS.MulticastDownloader.Core.Server
             return "[" + (this.Session != null ? this.Session.SessionId.ToString(CultureInfo.InvariantCulture) : string.Empty) + "]" + (this.RemoteAddress ?? string.Empty) + ":" + this.RemotePort;
         }
 
-        internal async Task<string> AcceptConnection(CancellationToken token)
+        internal string AcceptConnection(CancellationToken token)
         {
+            this.RemoteAddress = this.ServerConnection.TcpSession.RemoteAddress;
+            this.RemotePort = this.ServerConnection.TcpSession.RemotePort;
+
             if (this.Server.Connections.Count >= this.Server.ServerSettings.MaxConnections)
             {
                 throw new InvalidOperationException(Resources.TooManyConnections);
@@ -336,7 +325,7 @@ namespace MS.MulticastDownloader.Core.Server
 
             Response connectResponse = new Response();
             connectResponse.ResponseType = ResponseId.Ok;
-            await this.ServerConnection.Send(connectResponse, token);
+            this.ServerConnection.Send(connectResponse, token);
 
             Challenge challenge = new Challenge();
             if (this.Server.Settings.Encoder != null)
@@ -345,7 +334,7 @@ namespace MS.MulticastDownloader.Core.Server
                 challenge.ChallengeKey = encoder.Encode(this.Server.ChallengeKey);
             }
 
-            await this.ServerConnection.Send(challenge, token);
+            this.ServerConnection.Send(challenge, token);
             if (this.Server.Parameters.UseTls)
             {
                 // We use TLS to secure the connection before sending back the decoded response.
@@ -354,7 +343,7 @@ namespace MS.MulticastDownloader.Core.Server
                 this.ServerConnection.AcceptTls(psk);
             }
 
-            ChallengeResponse challengeResponse = await this.ServerConnection.Receive<ChallengeResponse>(token);
+            ChallengeResponse challengeResponse = this.ServerConnection.Receive<ChallengeResponse>(token);
             Response authResponse = new Response();
             authResponse.ResponseType = ResponseId.Ok;
             if (challenge.ChallengeKey != null)
@@ -369,20 +358,20 @@ namespace MS.MulticastDownloader.Core.Server
                 }
             }
 
-            await this.ServerConnection.Send(authResponse, token);
+            this.ServerConnection.Send(authResponse, token);
             authResponse.ThrowIfFailed();
             this.log.Info("Connection from " + this + " accepted.");
 
-            SessionJoinRequest request = await this.ServerConnection.Receive<SessionJoinRequest>(token);
+            SessionJoinRequest request = this.ServerConnection.Receive<SessionJoinRequest>(token);
             this.log.InfoFormat("Payload '{0}' requested with state: {1}", request.Path ?? "<null>", request.State);
             this.State = request.State;
             return request.Path;
         }
 
-        internal async Task JoinSession(MulticastSession session, CancellationToken timeoutToken)
+        internal void JoinSession(MulticastSession session, CancellationToken timeoutToken)
         {
             DateTime now = DateTime.Now;
-            this.throughputCalculator.Start(session.TotalBytes, now);
+            this.throughputCalculator.Start(0, now);
             this.WhenJoined = now;
             this.bytesPerSecond = new BoxedLong(0);
             this.WhenExpires = now + this.Server.Settings.ReadTimeout;
@@ -396,10 +385,10 @@ namespace MS.MulticastDownloader.Core.Server
             sjr.WaveNumber = session.WaveNumber;
             this.log.DebugFormat("SJR: " + sjr.MulticastAddress + ":" + sjr.MulticastPort + "; " + sjr.CountSegments + " segments, session id: " + this.Session.SessionId + ", wave: " + sjr.WaveNumber);
             this.written = new BitVector(session.CountChunks);
-            await this.ServerConnection.Send(sjr, timeoutToken);
+            this.ServerConnection.Send(sjr, timeoutToken);
         }
 
-        internal async Task SessionJoinFailed(CancellationToken timeoutToken, Exception ex)
+        internal void SessionJoinFailed(CancellationToken timeoutToken, Exception ex)
         {
             SessionJoinResponse sjr = new SessionJoinResponse();
             if (ex is FileNotFoundException)
@@ -417,25 +406,29 @@ namespace MS.MulticastDownloader.Core.Server
 
             sjr.Message = ex.Message;
             this.log.Error("Join failed: " + sjr.ResponseType + " (" + sjr.Message + ")");
-            await this.ServerConnection.Send(sjr, timeoutToken);
+            this.ServerConnection.Send(sjr, timeoutToken);
         }
 
-        internal void UpdatePacketStatus(PacketStatusUpdate psu, DateTime when, CancellationToken token)
+        internal void UpdatePacketStatus(PacketStatusUpdate psu, DateTime when)
         {
             this.WhenExpires = when + this.Server.Settings.ReadTimeout;
-            long average = this.throughputCalculator.UpdateThroughput(psu.BytesLeft, when);
-            this.bytesPerSecond = new BoxedLong(average);
-            this.log.Debug("[" + this + "] Bytes left: " + psu.BytesLeft + ", bytes per second: " + average);
-            if (psu.LeavingSession && this.LeavingSession != psu.LeavingSession)
+            if (this.Session == this.Server.ActiveSession)
             {
-                this.LeavingSession = psu.LeavingSession;
+                long average = this.throughputCalculator.UpdateThroughput(psu.BytesRecieved, when);
+                this.bytesPerSecond = new BoxedLong(average);
+                this.log.Debug("[" + this + "] Bytes recieved: " + psu.BytesRecieved + ", bytes per second: " + average);
+            }
+
+            if (psu.LeavingSession && !this.LeavingSession)
+            {
+                this.LeavingSession = true;
                 this.log.Debug("[" + this + "] leaving session");
             }
         }
 
-        internal void UpdateWaveStatus(WaveStatusUpdate wsu, DateTime when, CancellationToken token)
+        internal void UpdateWaveStatus(WaveStatusUpdate wsu, DateTime when)
         {
-            this.UpdatePacketStatus(wsu, when, token);
+            this.UpdatePacketStatus(wsu, when);
             long len = this.written.Count;
             this.written = new BitVector(len, wsu.FileBitVector);
         }

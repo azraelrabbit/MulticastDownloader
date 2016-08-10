@@ -39,12 +39,43 @@ namespace MS.MulticastDownloader.Core.Server.IO
             }
         }
 
+        internal long TotalBytes
+        {
+            get
+            {
+                long bytes = 0;
+                foreach (FileChunk chunk in this.Chunks)
+                {
+                    bytes += chunk.Block.Length;
+                }
+
+                return bytes;
+            }
+        }
+
+        internal long BytesRemaining
+        {
+            get
+            {
+                long bytes = 0;
+                foreach (FileChunk chunk in this.Chunks)
+                {
+                    if (!this.read[chunk.Block.SegmentId])
+                    {
+                        bytes += chunk.Block.Length;
+                    }
+                }
+
+                return bytes;
+            }
+        }
+
         internal async Task<IEnumerable<FileSegment>> ReadSegments(int numSegs)
         {
             Contract.Requires(numSegs >= 0);
             int remaining = numSegs;
             List<FileSegment> ret = new List<FileSegment>(numSegs);
-            Task lastRead = null;
+            Task lastRead = Task.Run(() => { });
             while (remaining > 0)
             {
                 Contract.Requires(this.segmentId >= 0 && this.segmentId < this.Count);
@@ -62,16 +93,12 @@ namespace MS.MulticastDownloader.Core.Server.IO
                     segment.Data = new byte[chunk.Block.Length];
                     --remaining;
                     ret.Add(segment);
-                    if (lastRead != null)
-                    {
-                        await lastRead;
-                    }
-
                     if (chunk.Block.Offset != chunk.Stream.Position)
                     {
-                        await Task.Run(() => chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin));
+                        chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin);
                     }
 
+                    await lastRead;
                     lastRead = chunk.Stream.ReadAsync(segment.Data, 0, segment.Data.Length);
                 }
 

@@ -113,7 +113,7 @@ namespace MS.MulticastDownloader.Tests.IO
                     while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
                     {
                         await Task.Delay(200);
-                        foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
+                        foreach (ServerConnection serverConn in listener.ReceiveConnections(CancellationToken.None))
                         {
                             Assert.Equal(uriParams, serverConn.UriParameters);
                             Assert.Equal(settings, serverConn.Settings);
@@ -150,12 +150,12 @@ namespace MS.MulticastDownloader.Tests.IO
                             int d = (1 + i) * (1 + j);
                             td.Data = BitConverter.GetBytes(d);
                             remaining.Add(d);
-                            writeTasks.Add(clientConns[j].Send(td, CancellationToken.None));
+                            writeTasks.Add(Task.Run(() => clientConns[j].Send(td, CancellationToken.None)));
                         }
 
                         for (int j = 0; j < clientConns.Count; ++j)
                         {
-                            TestData td2 = await serverConns[j].Receive<TestData>(CancellationToken.None);
+                            TestData td2 = serverConns[j].Receive<TestData>(CancellationToken.None);
                             int d = BitConverter.ToInt32(td2.Data, 0);
                             Assert.True(remaining.Remove(d));
                         }
@@ -176,7 +176,7 @@ namespace MS.MulticastDownloader.Tests.IO
                     while (DateTime.Now < end && serverConns.Count < serverSettings.MaxConnections)
                     {
                         await Task.Delay(200);
-                        foreach (ServerConnection serverConn in await listener.ReceiveConnections(CancellationToken.None))
+                        foreach (ServerConnection serverConn in listener.ReceiveConnections(CancellationToken.None))
                         {
                             serverConns.Add(serverConn);
                         }
@@ -213,7 +213,7 @@ namespace MS.MulticastDownloader.Tests.IO
                     while (DateTime.Now < end && serverConn == null)
                     {
                         await Task.Delay(200);
-                        foreach (ServerConnection conn in await listener.ReceiveConnections(CancellationToken.None))
+                        foreach (ServerConnection conn in listener.ReceiveConnections(CancellationToken.None))
                         {
                             serverConn = conn;
                             break;

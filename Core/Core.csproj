@@ -80,7 +80,6 @@
     <Compile Include="IO\ConnectionBase.cs" />
     <Compile Include="IO\NamespaceDoc.cs" />
     <Compile Include="IO\SessionConnectionBase.cs" />
-    <Compile Include="IO\TaskExtensionMethods.cs" />
     <Compile Include="IMulticastSettings.cs" />
     <Compile Include="IReceptionReporting.cs" />
     <Compile Include="ISequenceReporting.cs" />

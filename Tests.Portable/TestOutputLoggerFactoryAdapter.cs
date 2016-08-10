@@ -49,7 +49,7 @@ namespace MS.MulticastDownloader.Tests
                 {
                     if (message != null)
                     {
-                        this.outputHelper.WriteLine("[" + level.ToString() + "]: " + message);
+                        this.outputHelper.WriteLine(DateTime.Now.ToString() + " [" + level.ToString() + "]: " + message);
                     }
 
                     if (exception != null)

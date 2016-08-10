@@ -37,7 +37,7 @@ namespace MS.MulticastDownloader.Core.Session
         {
             Contract.Requires(when >= this.lastUpdate);
             Contract.Requires(this.bytesLeft >= bytesRemaining);
-            this.bytesPerSecondAtInterval[this.nextInterval] = (long)((double)(this.bytesLeft - bytesRemaining) / (when - this.lastUpdate).TotalSeconds);
+            this.bytesPerSecondAtInterval[this.nextInterval] = (long)((double)Math.Abs(this.bytesLeft - bytesRemaining) / (when - this.lastUpdate).TotalSeconds);
             this.nextInterval = (this.nextInterval + 1) % this.maxIntervals;
             this.bytesLeft = bytesRemaining;
             this.lastUpdate = when;

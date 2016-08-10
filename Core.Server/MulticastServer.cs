@@ -7,6 +7,7 @@ namespace MS.MulticastDownloader.Core.Server
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Diagnostics.Contracts;
     using System.Globalization;
     using System.IO;
     using System.Linq;
@@ -32,29 +33,17 @@ namespace MS.MulticastDownloader.Core.Server
     /// <seealso cref="IReceptionReporting" />
     public class MulticastServer : ServerBase, ITransferReporting, IReceptionReporting
     {
-        // Clients much respond to any request with the given interval
-        internal static readonly TimeSpan ResponseDelay = TimeSpan.FromSeconds(60);
-
-        private const int MinBurstDelay = 1;
-        private const int StartBurstDelay = 10;
-        private const int MaxBurstDelay = 999;
-        private const double DecreaseThreshold = 0.98;
-        private const double IncreaseThreshold = 0.90;
-
         private ILog log = LogManager.GetLogger<MulticastServer>();
         private object connectionLock = new object();
         private object sessionLock = new object();
         private List<MulticastConnection> connections = new List<MulticastConnection>();
         private List<MulticastSession> sessions = new List<MulticastSession>();
         private MulticastSession activeSession;
-        private AutoResetEvent joinEvent = new AutoResetEvent(false);
         private ServerListener listener;
         private IUdpMulticastFactory udpMulticast;
         private HashEncoderFactory encoderFactory;
         private BoxedDouble receptionRate = new BoxedDouble(1.0);
         private CancellationToken token = CancellationToken.None;
-        private Task acceptTask;
-        private bool listening;
         private bool disposed;
 
         /// <summary>
@@ -115,6 +104,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             this.udpMulticast = udpMulticast;
+            this.BurstDelayMs = ServerConstants.StartBurstDelay;
         }
 
         /// <summary>
@@ -273,6 +263,14 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
+        internal MulticastSession ActiveSession
+        {
+            get
+            {
+                return this.activeSession;
+            }
+        }
+
         internal byte[] ChallengeKey
         {
             get;
@@ -305,38 +303,36 @@ namespace MS.MulticastDownloader.Core.Server
             return Task.Run(async () =>
             {
                 this.log.Info("Starting multicast server");
+                await this.listener.Listen();
                 try
                 {
-                    this.acceptTask = this.AcceptAndJoinClients(token);
-                    using (CancellationTokenRegistration registration = this.token.Register(this.CancelListen))
+                    for (; ;)
                     {
-                        while (this.listening)
+                        this.token.ThrowIfCancellationRequested();
+                        while (this.Connections.Count == 0)
                         {
-                            if (this.acceptTask.IsFaulted || this.acceptTask.IsCanceled || this.acceptTask.IsCompleted)
-                            {
-                                // We may have gotten hanked.
-                                await this.acceptTask;
-                                break;
-                            }
+                            await Task.Delay(Constants.PacketUpdateInterval, this.token);
+                            await this.AcceptAndJoinClients(false, this.token);
+                        }
 
-                            this.joinEvent.WaitOne(10000);
-                            while (this.listening)
+                        while (this.Connections.Count > 0)
+                        {
+                            // Calculate the multicast payload for the open sessions and transmit a multicast wave.
+                            this.token.ThrowIfCancellationRequested();
+                            ICollection<MulticastConnection> waveConnections = await this.CleanupConnections();
+                            ICollection<MulticastSession> waveSessions = this.CalculatePayloadAndCleanupSessions(waveConnections);
+                            if (waveConnections.Count > 0)
                             {
-                                this.token.ThrowIfCancellationRequested();
-                                if (this.Connections.Count == 0 || this.Sessions.Count == 0)
-                                {
-                                    break;
-                                }
-
-                                // Calculate the multicast payload for the open sessions and transmit a multicast wave.
-                                ICollection<MulticastConnection> waveConnections = await this.CleanupConnections();
-                                ICollection<MulticastSession> waveSessions = this.CalculatePayloadAndCleanupSessions(waveConnections);
-                                this.token.ThrowIfCancellationRequested();
+                                Contract.Assert(waveSessions.Count > 0);
                                 await this.TransmitUdp(waveSessions, waveConnections);
-                                await this.WaveUpdate();
+                                await this.WaveStatusUpdate(waveConnections);
                             }
                         }
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -348,10 +344,6 @@ namespace MS.MulticastDownloader.Core.Server
 
                     throw;
                 }
-                finally
-                {
-                    this.listening = false;
-                }
             });
         }
 
@@ -362,87 +354,93 @@ namespace MS.MulticastDownloader.Core.Server
         public async Task Close()
         {
             await this.listener.Close();
-            foreach (MulticastConnection conn in this.Connections)
+            foreach (MulticastConnection mc in this.Connections)
             {
-                await conn.Close();
-            }
-
-            if (this.acceptTask != null)
-            {
-                await this.acceptTask;
+                this.log.Debug("Closing connection " + mc);
+                await mc.Close();
             }
         }
 
-        internal async Task AcceptAndJoinClients(CancellationToken token)
+        internal async Task AcceptAndJoinClients(bool listen, CancellationToken token)
         {
-            this.token = token;
-            this.listening = true;
-            await this.listener.Listen();
-            while (this.listening)
+            if (listen)
             {
-                ICollection<ServerConnection> conns = await this.listener.ReceiveConnections(this.token);
-                foreach (ServerConnection conn in conns)
+                this.token = token;
+                await this.listener.Listen();
+            }
+
+            ICollection<ServerConnection> conns = this.listener.ReceiveConnections(this.token);
+            foreach (ServerConnection conn in conns)
+            {
+                MulticastConnection mcConn = new MulticastConnection(this, conn);
+                string path;
+                try
                 {
-                    using (CancellationTokenSource timeoutCts = new CancellationTokenSource())
-                    using (CancellationTokenRegistration sessionTokenCanceller = this.token.Register(() => timeoutCts.Cancel()))
-                    using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
+                    path = mcConn.AcceptConnection(this.token);
+                    MulticastSession session = await this.GetSession(path);
+                    mcConn.JoinSession(session, this.token);
+                }
+                catch (Exception ex)
+                {
+                    this.log.Warn("Client connection failed");
+                    this.log.Warn(ex.Message);
+                    try
                     {
-                        CancellationToken timeoutToken = timeoutCts.Token;
-                        MulticastConnection mcConn = new MulticastConnection(this, conn);
-                        string path;
-                        try
-                        {
-                            timeoutCts.CancelAfter(ResponseDelay);
-                            path = await mcConn.AcceptConnection(timeoutToken);
-
-                            MulticastSession session = await this.GetSession(path);
-
-                            timeoutCts.CancelAfter(ResponseDelay);
-                            await mcConn.JoinSession(session, timeoutToken);
-                        }
-                        catch (Exception ex)
-                        {
-                            this.log.Warn("Client connection failed");
-                            this.log.Warn(ex.Message);
-                            await mcConn.SessionJoinFailed(timeoutToken, ex);
-                            continue;
-                        }
-
-                        lock (this.connectionLock)
-                        {
-                            if (this.connections.Contains(mcConn))
-                            {
-                                throw new InvalidOperationException(Resources.AttemptToAddDuplicateConnection);
-                            }
-
-                            this.connections.Add(mcConn);
-                            this.joinEvent.Set();
-                        }
+                        mcConn.SessionJoinFailed(this.token, ex);
                     }
+                    catch (Exception)
+                    {
+                    }
+
+                    continue;
+                }
+
+                lock (this.connectionLock)
+                {
+                    if (this.connections.Contains(mcConn))
+                    {
+                        throw new InvalidOperationException(Resources.AttemptToAddDuplicateConnection);
+                    }
+
+                    this.connections.Add(mcConn);
                 }
             }
         }
 
         internal async Task<ICollection<MulticastConnection>> CleanupConnections()
         {
-            ICollection<MulticastConnection> connections = this.Connections;
-            List<MulticastConnection> newConns = new List<MulticastConnection>(connections.Count);
-            DateTime now = DateTime.Now;
-            foreach (MulticastConnection conn in connections)
+            List<MulticastConnection> toRemove = new List<MulticastConnection>();
+            try
             {
-                if (conn.LeavingSession || conn.WhenExpires < now)
+                lock (this.connectionLock)
+                {
+                    List<MulticastConnection> newConns = new List<MulticastConnection>(this.connections.Count);
+                    DateTime now = DateTime.Now;
+                    foreach (MulticastConnection conn in this.connections)
+                    {
+                        if (conn.LeavingSession || conn.WhenExpires < now)
+                        {
+                            this.log.Debug("Removing connection " + conn);
+                            toRemove.Add(conn);
+                        }
+                        else
+                        {
+                            newConns.Add(conn);
+                        }
+                    }
+
+                    this.connections = newConns;
+                    return newConns;
+                }
+            }
+            finally
+            {
+                foreach (MulticastConnection conn in toRemove)
                 {
                     await conn.Close();
                     conn.Dispose();
                 }
-                else
-                {
-                    newConns.Add(conn);
-                }
             }
-
-            this.connections = newConns;
-            return newConns;
         }
 
         internal ICollection<MulticastSession> CalculatePayloadAndCleanupSessions(ICollection<MulticastConnection> connections)
@@ -483,63 +481,85 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal async Task WaveUpdate()
+        internal async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
         {
-            await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>((wsu, mc, token) =>
+            using (AutoResetEvent sessionCompleteEvent = new AutoResetEvent(false))
             {
-                DateTime when = DateTime.Now;
-                mc.UpdateWaveStatus(wsu, when, token);
+                foreach (MulticastSession session in sessions)
+                {
+                    Func<long, Task> createBackgroundTask = (l) =>
+                    {
+                        return Task.Run(async () =>
+                        {
+                            sessionCompleteEvent.WaitOne(Constants.PacketUpdateInterval);
+                            await this.AcceptAndJoinClients(false, this.token);
+                            await this.PacketStatusUpdate(connections, false, this.token);
+                            session.UpdateSessionStatus(l);
+                        });
+                    };
+                    Func<Task<ICollection<FileSegment>>> createReadTask = () => session.ReadBurst();
+                    Func<ICollection<FileSegment>, Task<long>> createWriteTask = (fs) => session.WriteBurst(fs);
+
+                    this.activeSession = session;
+                    session.BeginBurst();
+                    long seq = 0;
+                    long end = session.Written.RawBits.LongCount();
+                    Task backgroundTask = createBackgroundTask(seq);
+                    Task<ICollection<FileSegment>> readTask = createReadTask();
+                    Task<long> writeTask = Task.FromResult<long>(0);
+                    while (seq < end)
+                    {
+                        Task waited = await Task.WhenAny(backgroundTask, readTask);
+                        if (waited == backgroundTask)
+                        {
+                            await backgroundTask;
+                            if (seq < end)
+                            {
+                                backgroundTask = createBackgroundTask(seq);
+                            }
+                        }
+                        else if (waited == readTask)
+                        {
+                            ICollection<FileSegment> toWrite = await readTask;
+                            readTask = createReadTask();
+                            seq = await writeTask;
+                            writeTask = createWriteTask(toWrite);
+                        }
+                    }
+
+                    sessionCompleteEvent.Set();
+                    await Task.WhenAll(backgroundTask, readTask, writeTask);
+                }
+            }
+
+            await this.PacketStatusUpdate(connections, true, this.token);
+        }
+
+        internal async Task PacketStatusUpdate(ICollection<MulticastConnection> connections, bool waveComplete, CancellationToken waveCompleteToken)
+        {
+            long bytesLeft = this.activeSession.BytesRemaining;
+            await this.RespondToClients<PacketStatusUpdate, PacketStatusUpdateResponse>(connections, (psu, mc) =>
+            {
+                mc.UpdatePacketStatus(psu, DateTime.Now);
+                PacketStatusUpdateResponse response = new PacketStatusUpdateResponse();
+                response.ResponseType = waveComplete ? ResponseId.WaveComplete : ResponseId.Ok;
+                response.ReceptionRate = mc.ReceptionRate;
+                return response;
+            });
+
+            this.UpdateBurstDelay(connections);
+        }
+
+        internal async Task WaveStatusUpdate(ICollection<MulticastConnection> connections)
+        {
+            await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>(connections, (wsu, mc) =>
+            {
+                mc.UpdateWaveStatus(wsu, DateTime.Now);
                 WaveCompleteResponse response = new WaveCompleteResponse();
                 response.ResponseType = ResponseId.Ok;
                 response.WaveNumber = mc.Session.WaveNumber;
                 return response;
             });
-        }
-
-        internal async Task TransmitUdp(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
-        {
-            using (CancellationTokenSource statusCts = new CancellationTokenSource())
-            using (CancellationTokenRegistration statusCancellationTokenCanceller = statusCts.Token.Register(() => statusCts.Cancel()))
-            {
-                Task statusUpdate = this.ProcessStatusUpdates(connections, statusCts.Token);
-                foreach (MulticastSession session in sessions)
-                {
-                    this.token.ThrowIfCancellationRequested();
-                    this.activeSession = session;
-                    await session.TransmitWave(this.token);
-                }
-
-                statusCts.Cancel();
-                await statusUpdate;
-            }
-        }
-
-        internal async Task ProcessStatusUpdates(ICollection<MulticastConnection> connections, CancellationToken updateToken)
-        {
-            bool waveComplete = false;
-            using (CancellationTokenRegistration registration = updateToken.Register(() => waveComplete = true))
-            {
-                bool finalUpdate = false;
-                while (this.listening && !finalUpdate)
-                {
-                    if (waveComplete)
-                    {
-                        finalUpdate = true;
-                    }
-
-                    await this.RespondToClients<PacketStatusUpdate, PacketStatusUpdateResponse>((psu, mc, token) =>
-                    {
-                        DateTime when = DateTime.Now;
-                        mc.UpdatePacketStatus(psu, when, token);
-                        PacketStatusUpdateResponse response = new PacketStatusUpdateResponse();
-                        response.ResponseType = finalUpdate ? ResponseId.WaveComplete : ResponseId.Ok;
-                        response.ReceptionRate = mc.ReceptionRate;
-                        return response;
-                    });
-
-                    this.UpdateBurstDelay(connections);
-                }
-            }
         }
 
         internal void UpdateBurstDelay(ICollection<MulticastConnection> connections)
@@ -569,26 +589,26 @@ namespace MS.MulticastDownloader.Core.Server
 
             this.receptionRate = new BoxedDouble(receptionRate);
             int burstDelay = this.BurstDelayMs;
-            if (receptionRate < IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
+            if (receptionRate < ServerConstants.IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
             {
                 ++burstDelay;
             }
-            else if (receptionRate > DecreaseThreshold)
+            else if (receptionRate > ServerConstants.DecreaseThreshold)
             {
                 --burstDelay;
             }
 
-            if (burstDelay < MinBurstDelay)
+            if (burstDelay < ServerConstants.MinBurstDelay)
             {
-                burstDelay = MinBurstDelay;
+                burstDelay = ServerConstants.MinBurstDelay;
             }
-            else if (burstDelay > MaxBurstDelay)
+            else if (burstDelay > ServerConstants.MaxBurstDelay)
             {
-                burstDelay = MaxBurstDelay;
+                burstDelay = ServerConstants.MaxBurstDelay;
             }
 
             this.BurstDelayMs = burstDelay;
-            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay);
+            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay + ", conns: " + connections.Count);
         }
 
         internal async Task<MulticastSession> GetSession(string path)
@@ -672,76 +692,43 @@ namespace MS.MulticastDownloader.Core.Server
                     if (this.listener != null)
                     {
                         this.listener.Dispose();
-                        this.listener = null;
-                    }
-
-                    if (this.joinEvent != null)
-                    {
-                        this.joinEvent.Dispose();
                     }
                 }
-
-                this.sessions = null;
-                this.connections = null;
             }
         }
 
         // Read a request from each client, and send a response back. Completes when all clients are responded to, or when the built-in response delay completes.
-        private Task RespondToClients<TRequest, TResponse>(Func<TRequest, MulticastConnection, CancellationToken, TResponse> clientAction)
+        private Task RespondToClients<TRequest, TResponse>(ICollection<MulticastConnection> connections, Func<TRequest, MulticastConnection, TResponse> clientAction)
             where TRequest : class
             where TResponse : class
         {
             return Task.Run(() =>
             {
-                ICollection<MulticastConnection> conns = this.Connections;
-                object listLock = new object();
-                List<MulticastConnection> failedConnections = new List<MulticastConnection>();
-                using (CancellationTokenSource timeoutCts = new CancellationTokenSource(ResponseDelay))
-                using (CancellationTokenRegistration sessionTokenCanceller = this.token.Register(() => timeoutCts.Cancel()))
-                using (CancellationTokenRegistration timeoutCancellationTokenCanceller = timeoutCts.Token.Register(() => timeoutCts.Cancel()))
+                if (connections.Count > 0)
                 {
-                    CancellationToken timeoutToken = timeoutCts.Token;
-                    conns.AsParallel().ForAll(async (mc) =>
+                    connections.AsParallel().ForAll((mc) =>
                     {
                         if (!mc.LeavingSession)
                         {
                             try
                             {
-                                TRequest request = await mc.ServerConnection.Receive<TRequest>(timeoutToken);
-                                TResponse response = clientAction(request, mc, timeoutToken);
-                                await mc.ServerConnection.Send(response, timeoutToken);
+                                TRequest request = mc.ServerConnection.Receive<TRequest>(this.token);
+                                TResponse response = clientAction(request, mc);
+                                if (!mc.LeavingSession)
+                                {
+                                    mc.ServerConnection.Send(response, this.token);
+                                }
                             }
                             catch (Exception ex)
                             {
-                                lock (listLock)
-                                {
-                                    this.log.Warn("Connection failed: " + mc);
-                                    this.log.Warn(ex);
-                                    mc.Dispose();
-                                    failedConnections.Add(mc);
-                                }
+                                this.log.Warn("Connection failed: " + mc);
+                                this.log.Warn(ex);
+                                mc.LeavingSession = true;
                             }
                         }
                     });
-
-                    if (failedConnections.Count > 0)
-                    {
-                        lock (this.connectionLock)
-                        {
-                            foreach (MulticastConnection conn in failedConnections)
-                            {
-                                this.connections.Remove(conn);
-                            }
-                        }
-                    }
                 }
             });
-        }
-
-        private void CancelListen()
-        {
-            this.listening = false;
-            this.joinEvent.Set();
         }
     }
 }
