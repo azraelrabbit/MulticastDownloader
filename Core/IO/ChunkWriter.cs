@@ -65,8 +65,6 @@ namespace MS.MulticastDownloader.Core.IO
         internal async Task WriteSegments(IEnumerable<FileSegment> segments)
         {
             Contract.Requires(segments != null);
-            Task lastWrite = Task.Run(() => { });
-            long lastSegment = long.MinValue;
             foreach (FileSegment segment in segments)
             {
                 Contract.Requires(segment.SegmentId >= 0 && segment.SegmentId < this.Count);
@@ -80,13 +78,9 @@ namespace MS.MulticastDownloader.Core.IO
                         chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin);
                     }
 
-                    lastSegment = segment.SegmentId;
-                    await lastWrite;
-                    lastWrite = chunk.Stream.WriteAsync(segment.Data, 0, segment.Data.Length);
+                    await chunk.Stream.WriteAsync(segment.Data, 0, segment.Data.Length);
                 }
             }
-
-            await lastWrite;
         }
     }
 }

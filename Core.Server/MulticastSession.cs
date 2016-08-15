@@ -402,6 +402,14 @@ namespace MS.MulticastDownloader.Core.Server
 
         internal async Task<long> WriteBurst(ICollection<FileSegment> segments)
         {
+            if (this.log.IsTraceEnabled)
+            {
+                foreach (FileSegment seg in segments)
+                {
+                    this.log.TraceFormat("W ID: {0}, len: {1}", seg.SegmentId, seg.Data.Length);
+                }
+            }
+
             await Task.WhenAll(this.writer.SendMulticast(segments), Task.Delay(this.Server.BurstDelayMs));
             long seq = this.SequenceNumber + segments.Count;
             this.seqNum = new BoxedLong(seq);
@@ -421,6 +429,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             long average = this.throughputCalculator.UpdateThroughput(bytesRemaining, DateTime.Now);
+            Contract.Assert(average >= 0);
             this.seqNum = new BoxedLong(seq);
             this.bytesPerSecond = new BoxedLong(average);
         }

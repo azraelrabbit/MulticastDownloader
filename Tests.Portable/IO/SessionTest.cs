@@ -150,12 +150,14 @@ namespace MS.MulticastDownloader.Tests.IO
                             int d = (1 + i) * (1 + j);
                             td.Data = BitConverter.GetBytes(d);
                             remaining.Add(d);
-                            writeTasks.Add(Task.Run(() => clientConns[j].Send(td, CancellationToken.None)));
+                            int s = j;
+                            writeTasks.Add(Task.Run(() => clientConns[s].Send(td, CancellationToken.None)));
                         }
 
                         for (int j = 0; j < clientConns.Count; ++j)
                         {
-                            TestData td2 = serverConns[j].Receive<TestData>(CancellationToken.None);
+                            int s = j;
+                            TestData td2 = serverConns[s].Receive<TestData>(CancellationToken.None);
                             int d = BitConverter.ToInt32(td2.Data, 0);
                             Assert.True(remaining.Remove(d));
                         }

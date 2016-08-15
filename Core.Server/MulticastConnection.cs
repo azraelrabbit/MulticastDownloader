@@ -371,7 +371,7 @@ namespace MS.MulticastDownloader.Core.Server
         internal void JoinSession(MulticastSession session, CancellationToken timeoutToken)
         {
             DateTime now = DateTime.Now;
-            this.throughputCalculator.Start(0, now);
+            this.throughputCalculator.Start(long.MaxValue, now);
             this.WhenJoined = now;
             this.bytesPerSecond = new BoxedLong(0);
             this.WhenExpires = now + this.Server.Settings.ReadTimeout;
@@ -414,7 +414,8 @@ namespace MS.MulticastDownloader.Core.Server
             this.WhenExpires = when + this.Server.Settings.ReadTimeout;
             if (this.Session == this.Server.ActiveSession)
             {
-                long average = this.throughputCalculator.UpdateThroughput(psu.BytesRecieved, when);
+                long average = this.throughputCalculator.UpdateThroughput(long.MaxValue - psu.BytesRecieved, when);
+                Contract.Assert(average >= 0);
                 this.bytesPerSecond = new BoxedLong(average);
                 this.log.Debug("[" + this + "] Bytes recieved: " + psu.BytesRecieved + ", bytes per second: " + average);
             }

@@ -294,11 +294,15 @@ namespace MS.MulticastDownloader.Core
                     await this.writer.Flush();
                     this.log.Info("client: Transfer complete");
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     this.log.Error("client: Session aborted: " + ex.GetType() + " '" + ex.Message + "'");
                     await this.TryCleanFiles();
-                    if (!(ex is SessionAbortedException) && !(ex is OperationCanceledException))
+                    if (!(ex is SessionAbortedException))
                     {
                         throw new SessionAbortedException(Resources.SessionAborted, ex);
                     }
@@ -453,11 +457,18 @@ namespace MS.MulticastDownloader.Core
                 Func<Task<ICollection<FileSegment>>> createReadTask = async () =>
                 {
                     ICollection<FileSegment> ret = await this.udpReader.ReceiveMulticast(Constants.ReadDelay);
+                    long received = bytesReceived.Value;
                     foreach (FileSegment segment in ret)
                     {
-                        bytesReceived = new BoxedLong(bytesReceived.Value + segment.Data.Length);
+                        if (this.log.IsTraceEnabled)
+                        {
+                            this.log.TraceFormat("R ID: {0}, len: {1}", segment.SegmentId, segment.Data.Length);
+                        }
+
+                        received += segment.Data.Length;
                     }
 
+                    bytesReceived = new BoxedLong(received);
                     return ret;
                 };
 

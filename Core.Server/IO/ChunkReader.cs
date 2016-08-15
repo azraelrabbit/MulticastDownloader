@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Core.Server.IO
 {
+    using System;
     using System.Collections.Generic;
     using System.Diagnostics.Contracts;
     using System.IO;
@@ -24,9 +25,8 @@ namespace MS.MulticastDownloader.Core.Server.IO
             : base(chunks)
         {
             Contract.Requires(readVector != null && readVector.Count == this.Count);
-            this.startSeg = chunks.First().Block.SegmentId;
-            FileChunk last = chunks.Last();
-            this.endSeg = last.Block.SegmentId + 1;
+            this.startSeg = 0;
+            this.endSeg = chunks.LongCount();
             this.segmentId = this.startSeg;
             this.read = readVector;
         }
@@ -73,10 +73,8 @@ namespace MS.MulticastDownloader.Core.Server.IO
         internal async Task<IEnumerable<FileSegment>> ReadSegments(int numSegs)
         {
             Contract.Requires(numSegs >= 0);
-            int remaining = numSegs;
             List<FileSegment> ret = new List<FileSegment>(numSegs);
-            Task lastRead = Task.Run(() => { });
-            while (remaining > 0)
+            while (ret.Count < numSegs && this.segmentId < this.Count)
             {
                 Contract.Requires(this.segmentId >= 0 && this.segmentId < this.Count);
                 if (this.segmentId >= this.endSeg)
@@ -91,23 +89,16 @@ namespace MS.MulticastDownloader.Core.Server.IO
                     FileSegment segment = new FileSegment();
                     segment.SegmentId = this.segmentId;
                     segment.Data = new byte[chunk.Block.Length];
-                    --remaining;
-                    ret.Add(segment);
                     if (chunk.Block.Offset != chunk.Stream.Position)
                     {
                         chunk.Stream.Seek(chunk.Block.Offset, SeekOrigin.Begin);
                     }
 
-                    await lastRead;
-                    lastRead = chunk.Stream.ReadAsync(segment.Data, 0, segment.Data.Length);
+                    await chunk.Stream.ReadAsync(segment.Data, 0, segment.Data.Length);
+                    ret.Add(segment);
                 }
 
                 ++this.segmentId;
-            }
-
-            if (lastRead != null)
-            {
-                await lastRead;
             }
 
             return ret;

@@ -2,6 +2,7 @@
   "$schema": "http://xunit.github.io/schema/v2.1-rc1/xunit.runner.schema.json",
   "diagnosticMessages": true,
   "shadowCopy": false,
+  "maxParallelThreads": 1,
   "parallelizeAssembly": false,
   "parallelizeTestCollections": false
 }

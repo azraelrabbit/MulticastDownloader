@@ -16,5 +16,10 @@
   },
   "runtimes": {
     "win": {}
+  },
+  "buildOptions": {
+    "copyToOutput": {
+      "include": [ "xunit.runner.json" ]
+    }
   }
 }

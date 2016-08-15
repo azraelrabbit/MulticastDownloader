@@ -50,7 +50,7 @@ namespace MS.MulticastDownloader.Tests
 
         public Task Close()
         {
-            return Task.Delay(0);
+            return Task.Run(() => this.socket.Closed = true);
         }
 
         public void Dispose()
@@ -90,19 +90,30 @@ namespace MS.MulticastDownloader.Tests
             private object bufferLock = new object();
             private Queue<byte[]> buffer = new Queue<byte[]>();
 
+            internal bool Closed
+            {
+                get;
+                set;
+            }
+
             internal Task<byte[]> Recieve()
             {
                 return Task.Run(async () =>
                 {
-                    while (this.buffer.Count == 0)
+                    while (this.buffer.Count == 0 && !this.Closed)
                     {
                         await Task.Delay(200);
                     }
 
-                    lock (this.bufferLock)
+                    if (this.buffer.Count > 0)
                     {
-                        return this.buffer.Dequeue();
+                        lock (this.bufferLock)
+                        {
+                            return this.buffer.Dequeue();
+                        }
                     }
+
+                    throw new OperationCanceledException();
                 });
             }
 

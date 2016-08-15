@@ -148,13 +148,21 @@ namespace MS.MulticastDownloader.Core.Session
                 return new BitVector(0);
             }
 
-            long countBits = first.RawBits.LongCount();
             BitVector ret = new BitVector(first.LongCount);
-            for (long r = 0; r < countBits; ++r)
+            for (long i = 0; i < ret.LongCount; ++i)
             {
+                int count = 0;
                 foreach (BitVector bv in vectors)
                 {
-                    ret.RawBits[r] &= bv.RawBits[r];
+                    if (bv[i])
+                    {
+                        ++count;
+                    }
+                }
+
+                if (count == vectors.Count)
+                {
+                    ret[i] = true;
                 }
             }
 

@@ -38,8 +38,8 @@ namespace MS.MulticastDownloader.Tests
         {
             string ins = "in" + Guid.NewGuid().ToString().Replace("-", string.Empty);
             string outs = "out" + Guid.NewGuid().ToString().Replace("-", string.Empty);
-            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, "in2", fileSizes);
-            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync("out2", CreationCollisionOption.ReplaceExisting);
+            IFolder inFolder = await CreateTestPayload(FileSystem.Current.LocalStorage, ins, fileSizes);
+            IFolder outFolder = await FileSystem.Current.LocalStorage.CreateFolderAsync(outs, CreationCollisionOption.ReplaceExisting);
             MulticastSettings serverSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, inFolder);
             MulticastSettings clientSettings = new MulticastSettings(null, bufferSize, TimeSpan.FromSeconds(readTimeout), 1, outFolder);
             MulticastServerSettings serverMulticastSettings = new MulticastServerSettings(DelayCalculation.MaximumThroughput, null, false, maxBytesPerSecond, int.MaxValue, int.MaxValue, mtu, "239.0.0.1", 8000, 100);
@@ -74,7 +74,7 @@ namespace MS.MulticastDownloader.Tests
                 }
             }
 
-            await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, "in2", "out2");
+            await CompareTestPayloadFolders(FileSystem.Current.LocalStorage, ins, outs);
         }
 
         //[Theory]
