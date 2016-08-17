@@ -4,6 +4,7 @@
 
 namespace MS.MulticastDownloader.Core
 {
+    using System.Collections.Generic;
     using Session;
 
     /// <summary>

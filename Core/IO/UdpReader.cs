@@ -30,7 +30,6 @@ namespace MS.MulticastDownloader.Core.IO
         private CancellationTokenSource readCts = new CancellationTokenSource();
         private AutoResetEvent jobAddedEvent = new AutoResetEvent(false);
         private ConcurrentQueue<DecodeJob> pendingDecodes = new ConcurrentQueue<DecodeJob>();
-        private ConcurrentBag<IDecoder> decoders = new ConcurrentBag<IDecoder>();
         private bool disposed;
 
         internal UdpReader(UriParameters parms, IMulticastSettings settings, IUdpMulticast udpMulticast)
@@ -132,6 +131,11 @@ namespace MS.MulticastDownloader.Core.IO
                 {
                     token.ThrowIfCancellationRequested();
                     byte[] read = await this.multicastClient.Receive();
+                    if (read == null)
+                    {
+                        break;
+                    }
+
                     if (this.bufferUse + read.Length > this.bufferSize * 8 / 10)
                     {
                         continue;
@@ -151,14 +155,8 @@ namespace MS.MulticastDownloader.Core.IO
                 byte[] next;
                 if (this.encoderFactory != null)
                 {
-                    IDecoder decoder;
-                    if (!this.decoders.TryTake(out decoder))
-                    {
-                        decoder = this.encoderFactory.CreateDecoder();
-                    }
-
+                    IDecoder decoder = this.encoderFactory.CreateDecoder();
                     next = decoder.Decode(data);
-                    this.decoders.Add(decoder);
                 }
                 else
                 {

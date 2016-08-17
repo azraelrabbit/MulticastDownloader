@@ -28,14 +28,14 @@ namespace MS.MulticastDownloader.Tests
         {
             return Task.Run(() =>
             {
-                this.socket = this.factory.Connect();
+                this.socket = this.factory.Connect(interfaceName, multicastAddr, multicastPort);
             });
         }
 
         public async Task<byte[]> Receive()
         {
             byte[] ret = await this.socket.Recieve();
-            Assert.True(ret.Length <= this.factory.Mtu);
+            Assert.True(ret == null || ret.Length <= this.factory.Mtu);
             return ret;
         }
 
@@ -105,7 +105,7 @@ namespace MS.MulticastDownloader.Tests
                         await Task.Delay(200);
                     }
 
-                    if (this.buffer.Count > 0)
+                    if (!this.Closed)
                     {
                         lock (this.bufferLock)
                         {
@@ -113,7 +113,7 @@ namespace MS.MulticastDownloader.Tests
                         }
                     }
 
-                    throw new OperationCanceledException();
+                    return null;
                 });
             }
 
@@ -133,7 +133,8 @@ namespace MS.MulticastDownloader.Tests
         {
             private readonly int mtu;
             private readonly double packetReceptionRate;
-            private UdpSocket socket = new UdpSocket();
+            private object socketsLock = new object();
+            private Dictionary<string, UdpSocket> socketsByKey = new Dictionary<string, UdpSocket>();
 
             internal PortableTestUdpMulticastFactory(int mtu, double packetReceptionRate)
             {
@@ -162,9 +163,18 @@ namespace MS.MulticastDownloader.Tests
                 return new PortableTestUdpMulticast(this);
             }
 
-            internal UdpSocket Connect()
+            internal UdpSocket Connect(string interfaceName, string multicastAddr, int multicastPort)
             {
-                return this.socket;
+                lock (this.socketsLock)
+                {
+                    string key = interfaceName + ":" + multicastAddr + ":" + multicastPort.ToString();
+                    if (!this.socketsByKey.ContainsKey(key))
+                    {
+                        this.socketsByKey[key] = new UdpSocket();
+                    }
+
+                    return this.socketsByKey[key];
+                }
             }
         }
     }

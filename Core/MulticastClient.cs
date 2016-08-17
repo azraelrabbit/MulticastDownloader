@@ -30,16 +30,18 @@ namespace MS.MulticastDownloader.Core
         private IEncoderFactory fileEncoder;
         private CancellationToken token;
         private FileSet fileSet;
-        private BitVector written;
         private ClientConnection cliConn;
         private ChunkWriter writer;
         private IUdpMulticastFactory udpMulticast;
         private UdpReader<FileSegment> udpReader;
-        private BoxedLong seqNum;
-        private BoxedLong waveNum;
-        private BoxedDouble receptionRate = new BoxedDouble(1.0);
+        private object seqLock = new object();
+        private long seqNum;
+        private long waveNum;
+        private object updateLock = new object();
+        private double receptionRate = 1.0;
         private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
-        private BoxedLong bytesPerSecond;
+        private long bytesPerSecond;
+        private long bytesRecieved;
         private int state;
         private bool disposedValue = false;
 
@@ -185,13 +187,10 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                BoxedLong bytesPerSecond = this.bytesPerSecond;
-                if (bytesPerSecond != null)
+                lock (this.updateLock)
                 {
-                    return bytesPerSecond.Value;
+                    return this.bytesPerSecond;
                 }
-
-                return 0;
             }
         }
 
@@ -205,7 +204,7 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                return this.written;
+                return new BitVector(this.writer.Written.LongCount, this.writer.Written.RawBits);
             }
         }
 
@@ -219,13 +218,10 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                BoxedLong seq = this.seqNum;
-                if (seq != null)
+                lock (this.seqLock)
                 {
-                    return seq.Value;
+                    return this.seqNum;
                 }
-
-                return 0;
             }
         }
 
@@ -239,13 +235,10 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                BoxedLong wave = this.waveNum;
-                if (wave != null)
+                lock (this.seqLock)
                 {
-                    return wave.Value;
+                    return this.waveNum;
                 }
-
-                return 0;
             }
         }
 
@@ -259,13 +252,10 @@ namespace MS.MulticastDownloader.Core
         {
             get
             {
-                BoxedDouble receptionRate = this.receptionRate;
-                if (receptionRate != null)
+                lock (this.updateLock)
                 {
-                    return receptionRate.Value;
+                    return this.receptionRate;
                 }
-
-                return 0;
             }
         }
 
@@ -399,17 +389,16 @@ namespace MS.MulticastDownloader.Core
                 SessionJoinResponse response = this.CheckResponse<SessionJoinResponse>();
                 this.fileSet = new FileSet(this.Settings.RootFolder, response.Files);
                 await this.fileSet.InitWrite();
-                if (this.written == null)
-                {
-                    long countChunks = this.fileSet.EnumerateChunks().LongCount();
-                    this.written = new BitVector(countChunks);
-                }
-
-                this.writer = new ChunkWriter(this.fileSet.EnumerateChunks(), this.written);
+                long countChunks = this.fileSet.EnumerateChunks().LongCount();
+                this.writer = new ChunkWriter(this.fileSet.EnumerateChunks(), new BitVector(countChunks));
                 this.log.Debug("client: Bytes remaining: " + this.BytesRemaining);
 
                 this.log.DebugFormat("client: Listening on {0}:{1}", response.MulticastAddress, response.MulticastPort);
-                this.waveNum = new BoxedLong(response.WaveNumber);
+                lock (this.seqLock)
+                {
+                    this.waveNum = response.WaveNumber;
+                }
+
                 this.log.Debug("client: Starting wave: " + response.WaveNumber);
                 return response;
             }
@@ -431,61 +420,14 @@ namespace MS.MulticastDownloader.Core
                 //// until we get a packet status update response.
                 this.cliConn.TcpSession.ReadStream.ReadTimeout = int.MaxValue;
                 this.udpReader = await this.cliConn.JoinMulticastServer(this.udpMulticast.CreateMulticast(), response, this.fileEncoder);
-                this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
+                this.throughputCalculator.Start(this.TotalBytes, DateTime.Now);
                 this.log.Info("client: Waiting for multicast payload");
+                this.bytesRecieved = 0;
 
-                BoxedLong bytesReceived = new BoxedLong(0);
-                Func<Task<long>> createStatusTask = () =>
-                {
-                    return Task.Run(() =>
-                    {
-                        long ret = this.BytesRemaining;
-                        if (this.UpdatePacketStatus(bytesReceived.Value, ret))
-                        {
-                            this.UpdateWaveStatus(bytesReceived.Value, ret);
-                        }
-
-                        if (this.cliConn.TcpSession.ReadStream.ReadTimeout == int.MaxValue)
-                        {
-                            this.cliConn.TcpSession.ReadStream.ReadTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
-                        }
-
-                        return ret;
-                    });
-                };
-
-                Func<Task<ICollection<FileSegment>>> createReadTask = async () =>
-                {
-                    ICollection<FileSegment> ret = await this.udpReader.ReceiveMulticast(Constants.ReadDelay);
-                    long received = bytesReceived.Value;
-                    foreach (FileSegment segment in ret)
-                    {
-                        if (this.log.IsTraceEnabled)
-                        {
-                            this.log.TraceFormat("R ID: {0}, len: {1}", segment.SegmentId, segment.Data.Length);
-                        }
-
-                        received += segment.Data.Length;
-                    }
-
-                    bytesReceived = new BoxedLong(received);
-                    return ret;
-                };
-
-                Func<ICollection<FileSegment>, Task> createWriteTask = async (l) =>
-                {
-                    await this.writer.WriteSegments(l);
-                    FileSegment last = l.LastOrDefault();
-                    if (last != null)
-                    {
-                        this.seqNum = new BoxedLong(last.SegmentId);
-                    }
-                };
-
-                Task<long> statusTask = createStatusTask();
-                Task<ICollection<FileSegment>> readTask = createReadTask();
+                Task<ICollection<FileSegment>> readTask = this.udpReader.ReceiveMulticast(Constants.ReadDelay);
                 Task writeTask = Task.Run(() => { });
-                long bytesLeft = this.BytesRemaining;
+                Task<long> statusTask = this.StatusUpdate();
+                long bytesLeft = this.TotalBytes;
                 while (bytesLeft > 0)
                 {
                     Task waited = await Task.WhenAny(statusTask, readTask);
@@ -494,20 +436,20 @@ namespace MS.MulticastDownloader.Core
                         bytesLeft = await statusTask;
                         if (bytesLeft > 0)
                         {
-                            statusTask = createStatusTask();
+                            statusTask = this.StatusUpdate();
                         }
                     }
                     else if (waited == readTask)
                     {
                         ICollection<FileSegment> received = await readTask;
-                        readTask = createReadTask();
+                        readTask = this.udpReader.ReceiveMulticast(Constants.ReadDelay);
                         await writeTask;
-                        writeTask = createWriteTask(received);
+                        writeTask = this.WriteTask(received);
                     }
                 }
 
                 await Task.WhenAll(readTask, writeTask, statusTask);
-                if (this.written.Contains(false) || this.BytesRemaining > 0)
+                if (this.writer.Written.Contains(false) || this.BytesRemaining > 0)
                 {
                     throw new InvalidOperationException();
                 }
@@ -525,24 +467,37 @@ namespace MS.MulticastDownloader.Core
         }
 
         // Returns true if the wave completed and we need to update our wave status
-        internal bool UpdatePacketStatus(long bytesRecieved, long bytesLeft)
+        internal bool UpdatePacketStatus(long bytesLeft)
         {
             try
             {
                 PacketStatusUpdate statusUpdate = new PacketStatusUpdate();
                 long average = this.throughputCalculator.UpdateThroughput(bytesLeft, DateTime.Now);
-                this.bytesPerSecond = new BoxedLong(average);
-                statusUpdate.BytesRecieved = bytesRecieved;
+                lock (this.updateLock)
+                {
+                    this.bytesPerSecond = average;
+                    statusUpdate.BytesRecieved = this.bytesRecieved;
+                }
+
                 statusUpdate.LeavingSession = bytesLeft == 0;
-                this.log.Debug("client: Sequence: " + this.SequenceNumber + "  Bytes left: " + bytesLeft + " Bytes per second: " + this.BytesPerSecond + "  Leaving session: " + (bytesLeft == 0));
                 this.cliConn.Send(statusUpdate, this.token);
                 if (!statusUpdate.LeavingSession)
                 {
                     PacketStatusUpdateResponse resp = this.CheckResponse<PacketStatusUpdateResponse>();
-                    this.receptionRate = new BoxedDouble(resp.ReceptionRate);
+                    lock (this.updateLock)
+                    {
+                        this.receptionRate = resp.ReceptionRate;
+                    }
+
                     return resp.ResponseType == ResponseId.WaveComplete && !statusUpdate.LeavingSession;
                 }
 
+                this.log.Debug("client: Sequence: " + this.SequenceNumber
+                             + "  Bytes received: " + statusUpdate.BytesRecieved
+                             + "  Bytes left: " + bytesLeft
+                             + "  Bytes per second: " + average
+                             + "  Reception Rate: " + this.ReceptionRate
+                             + "  Leaving session: " + (bytesLeft == 0));
                 return false;
             }
             catch (OperationCanceledException)
@@ -555,21 +510,29 @@ namespace MS.MulticastDownloader.Core
             }
         }
 
-        internal void UpdateWaveStatus(long bytesRecieved, long bytesLeft)
+        internal void UpdateWaveStatus(long bytesLeft)
         {
             try
             {
                 this.log.Debug("client: Wave complete");
                 WaveStatusUpdate waveUpdate = new WaveStatusUpdate();
-                waveUpdate.BytesRecieved = bytesRecieved;
+                lock (this.updateLock)
+                {
+                    waveUpdate.BytesRecieved = this.bytesRecieved;
+                    this.bytesRecieved = 0;
+                }
+
                 waveUpdate.LeavingSession = bytesLeft == 0;
-                this.log.Debug("client: Wave Sequence: " + this.SequenceNumber + "  Bytes left: " + bytesLeft + "  Leaving session: " + (bytesLeft == 0));
-                waveUpdate.FileBitVector = this.written.RawBits;
+                waveUpdate.FileBitVector = this.writer.Written.RawBits;
                 this.cliConn.Send(waveUpdate, this.token);
                 if (!waveUpdate.LeavingSession)
                 {
                     WaveCompleteResponse waveResp = this.CheckResponse<WaveCompleteResponse>();
-                    this.waveNum = new BoxedLong(waveResp.WaveNumber);
+                    lock (this.seqLock)
+                    {
+                        this.waveNum = waveResp.WaveNumber;
+                    }
+
                     this.log.Debug("client: New wave: " + waveResp.WaveNumber);
                 }
             }
@@ -597,9 +560,54 @@ namespace MS.MulticastDownloader.Core
                     this.DisposeInternal();
                 }
 
-                this.written = null;
                 this.writer = null;
             }
+        }
+
+        private async Task WriteTask(ICollection<FileSegment> segments)
+        {
+            await Task.WhenAll(
+                this.writer.WriteSegments(segments),
+                Task.Run(() =>
+                {
+                    FileSegment last = null;
+                    long read = 0;
+                    foreach (FileSegment seg in segments)
+                    {
+                        read += seg.Data.Length;
+                        last = seg;
+                    }
+
+                    if (last != null)
+                    {
+                        lock (this.seqLock)
+                        {
+                            this.seqNum = last.SegmentId;
+                        }
+
+                        lock (this.updateLock)
+                        {
+                            this.bytesRecieved += read;
+                        }
+                    }
+                }));
+        }
+
+        private async Task<long> StatusUpdate()
+        {
+            await Task.Delay(Constants.PacketUpdateInterval, this.token);
+            long remaining = this.BytesRemaining;
+            if (this.UpdatePacketStatus(remaining))
+            {
+                this.UpdateWaveStatus(remaining);
+            }
+
+            if (this.cliConn.TcpSession.ReadStream.ReadTimeout == int.MaxValue)
+            {
+                this.cliConn.TcpSession.ReadStream.ReadTimeout = (int)this.Settings.ReadTimeout.TotalMilliseconds;
+            }
+
+            return remaining;
         }
 
         private void DisposeInternal()

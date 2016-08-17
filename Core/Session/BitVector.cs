@@ -131,42 +131,36 @@ namespace MS.MulticastDownloader.Core.Session
         }
 
         /// <summary>
+        /// Prepares the bit vector to be intersected with other vectors.
+        /// </summary>
+        public void BeginIntersectOf()
+        {
+            for (long i = 0; i < this.RawBits.LongCount(); ++i)
+            {
+                this.RawBits[i] = 0xFF;
+            }
+        }
+
+        /// <summary>
         /// Computes the union of the collection of bit vectors in the parameter list.
         /// </summary>
-        /// <param name="vectors">The vectors to union.</param>
-        /// <returns>A <see cref="BitVector"/> containing the union of all sub-vector values.</returns>
-        public static BitVector IntersectOf(ICollection<BitVector> vectors)
+        /// <param name="vector">The vector to union.</param>
+        public void IntersectOf(BitVector vector)
         {
-            if (vectors == null)
+            if (vector == null)
             {
-                throw new ArgumentNullException("vectors");
+                throw new ArgumentNullException("vector");
             }
 
-            BitVector first = vectors.FirstOrDefault();
-            if (first == null)
+            if (this.LongCount != vector.LongCount)
             {
-                return new BitVector(0);
+                throw new IndexOutOfRangeException();
             }
 
-            BitVector ret = new BitVector(first.LongCount);
-            for (long i = 0; i < ret.LongCount; ++i)
+            for (long i = 0; i < this.RawBits.LongCount(); ++i)
             {
-                int count = 0;
-                foreach (BitVector bv in vectors)
-                {
-                    if (bv[i])
-                    {
-                        ++count;
-                    }
-                }
-
-                if (count == vectors.Count)
-                {
-                    ret[i] = true;
-                }
+                this.RawBits[i] &= vector.RawBits[i];
             }
-
-            return ret;
         }
 
         /// <summary>

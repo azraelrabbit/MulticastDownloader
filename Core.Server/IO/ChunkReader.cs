@@ -103,5 +103,10 @@ namespace MS.MulticastDownloader.Core.Server.IO
 
             return ret;
         }
+
+        internal void Reset()
+        {
+            this.segmentId = 0;
+        }
     }
 }

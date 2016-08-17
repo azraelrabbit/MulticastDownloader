@@ -24,16 +24,14 @@ namespace MS.MulticastDownloader.Core.Server
     /// <summary>
     /// Represent an initial multicast connection.
     /// </summary>
-    /// <seealso cref="ITransferReporting" />
-    /// <seealso cref="ISequenceReporting"/>
     /// <seealso cref="IReceptionReporting"/>
     /// <seealso cref="ServerBase" />
-    public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>, ITransferReporting, ISequenceReporting, IReceptionReporting
+    public class MulticastConnection : ServerBase, IEquatable<MulticastConnection>, IReceptionReporting
     {
         private ILog log = LogManager.GetLogger<MulticastConnection>();
-        private BoxedLong bytesPerSecond;
-        private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
-        private BitVector written;
+        private object updateLock = new object();
+        private long bytesRecieved = 0;
+        private double receptionRate = 0;
         private bool disposed;
 
         internal MulticastConnection(MulticastServer server, ServerConnection serverConn)
@@ -41,20 +39,6 @@ namespace MS.MulticastDownloader.Core.Server
             Contract.Requires(server != null && serverConn != null);
             this.Server = server;
             this.ServerConnection = serverConn;
-        }
-
-        /// <summary>
-        /// Gets the written bits.
-        /// </summary>
-        /// <value>
-        /// The written bits.
-        /// </value>
-        public BitVector Written
-        {
-            get
-            {
-                return this.written;
-            }
         }
 
         /// <summary>
@@ -94,102 +78,6 @@ namespace MS.MulticastDownloader.Core.Server
         }
 
         /// <summary>
-        /// Gets the total bytes in the payload.
-        /// </summary>
-        /// <value>
-        /// The total bytes in the payload.
-        /// </value>
-        public long TotalBytes
-        {
-            get
-            {
-                if (this.Session != null)
-                {
-                    return this.Session.TotalBytes;
-                }
-
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Gets the bytes remaining in the payload.
-        /// </summary>
-        /// <value>
-        /// The bytes remaining.
-        /// </value>
-        public long BytesRemaining
-        {
-            get
-            {
-                if (this.Session != null)
-                {
-                    return this.Session.BytesRemaining;
-                }
-
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Gets the current sequence number in the download.
-        /// </summary>
-        /// <value>
-        /// The sequence number.
-        /// </value>
-        public long SequenceNumber
-        {
-            get
-            {
-                if (this.Session != null)
-                {
-                    return this.Session.SequenceNumber;
-                }
-
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Gets the wave number for the session.
-        /// </summary>
-        /// <value>
-        /// The wave number.
-        /// </value>
-        public long WaveNumber
-        {
-            get
-            {
-                if (this.Session != null)
-                {
-                    return this.Session.WaveNumber;
-                }
-
-                return 0;
-            }
-        }
-
-        /// <summary>
-        /// Gets the bytes per second.
-        /// </summary>
-        /// <value>
-        /// The bytes per second.
-        /// </value>
-        public long BytesPerSecond
-        {
-            get
-            {
-                BoxedLong bps = this.bytesPerSecond;
-                if (bps != null)
-                {
-                    return bps.Value;
-                }
-
-                return 0;
-            }
-        }
-
-        /// <summary>
         /// Gets the packet reception rate for this connection.
         /// </summary>
         /// <value>
@@ -199,18 +87,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                if (this.Session != null)
+                lock (this.updateLock)
                 {
-                    long receiveRate = this.BytesPerSecond;
-                    long transmitRate = this.Session.BytesPerSecond;
-                    if (transmitRate > 0)
-                    {
-                        double ret = (double)receiveRate / (double)transmitRate;
-                        Contract.Assert(ret >= 0 && ret <= 1.0);
-                    }
+                    return this.receptionRate;
                 }
-
-                return 0.0;
             }
         }
 
@@ -348,7 +228,7 @@ namespace MS.MulticastDownloader.Core.Server
             authResponse.ResponseType = ResponseId.Ok;
             if (challenge.ChallengeKey != null)
             {
-                this.log.Debug("Authenticating challenge");
+                this.log.Debug(this + ": Authenticating challenge");
                 IDecoder decoder = this.Server.EncoderFactory.CreateDecoder();
                 byte[] responsePhrase = decoder.Decode(challengeResponse.ChallengeKey);
                 if (!responsePhrase.SequenceEqual(Constants.ResponseId))
@@ -360,10 +240,10 @@ namespace MS.MulticastDownloader.Core.Server
 
             this.ServerConnection.Send(authResponse, token);
             authResponse.ThrowIfFailed();
-            this.log.Info("Connection from " + this + " accepted.");
+            this.log.Info(this + ": Connection accepted.");
 
             SessionJoinRequest request = this.ServerConnection.Receive<SessionJoinRequest>(token);
-            this.log.InfoFormat("Payload '{0}' requested with state: {1}", request.Path ?? "<null>", request.State);
+            this.log.InfoFormat(this + ": Payload '{0}' requested with state: {1}", request.Path ?? "<null>", request.State);
             this.State = request.State;
             return request.Path;
         }
@@ -371,9 +251,7 @@ namespace MS.MulticastDownloader.Core.Server
         internal void JoinSession(MulticastSession session, CancellationToken timeoutToken)
         {
             DateTime now = DateTime.Now;
-            this.throughputCalculator.Start(long.MaxValue, now);
             this.WhenJoined = now;
-            this.bytesPerSecond = new BoxedLong(0);
             this.WhenExpires = now + this.Server.Settings.ReadTimeout;
             this.Session = session;
             SessionJoinResponse sjr = new SessionJoinResponse();
@@ -383,8 +261,7 @@ namespace MS.MulticastDownloader.Core.Server
             sjr.MulticastPort = session.MulticastPort;
             sjr.Files = session.FileHeaders.ToArray();
             sjr.WaveNumber = session.WaveNumber;
-            this.log.DebugFormat("SJR: " + sjr.MulticastAddress + ":" + sjr.MulticastPort + "; " + sjr.CountSegments + " segments, session id: " + this.Session.SessionId + ", wave: " + sjr.WaveNumber);
-            this.written = new BitVector(session.CountChunks);
+            this.log.DebugFormat(this + ": SJR: " + sjr.MulticastAddress + ":" + sjr.MulticastPort + "; " + sjr.CountSegments + " segments, session id: " + this.Session.SessionId + ", wave: " + sjr.WaveNumber);
             this.ServerConnection.Send(sjr, timeoutToken);
         }
 
@@ -405,38 +282,51 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             sjr.Message = ex.Message;
-            this.log.Error("Join failed: " + sjr.ResponseType + " (" + sjr.Message + ")");
+            this.log.Error(this + ": Join failed: " + sjr.ResponseType + " (" + sjr.Message + ")");
             this.ServerConnection.Send(sjr, timeoutToken);
         }
 
         internal void UpdatePacketStatus(PacketStatusUpdate psu, DateTime when)
         {
             this.WhenExpires = when + this.Server.Settings.ReadTimeout;
-            if (this.Session == this.Server.ActiveSession)
+            lock (this.updateLock)
             {
-                long average = this.throughputCalculator.UpdateThroughput(long.MaxValue - psu.BytesRecieved, when);
-                Contract.Assert(average >= 0);
-                this.bytesPerSecond = new BoxedLong(average);
-                this.log.Debug("[" + this + "] Bytes recieved: " + psu.BytesRecieved + ", bytes per second: " + average);
+                this.bytesRecieved = psu.BytesRecieved;
+                long bytesSent = this.Session.BytesSent;
+                if (bytesSent > 0)
+                {
+                    double rr = (double)this.bytesRecieved / (double)bytesSent;
+                    if (rr < 0.0)
+                    {
+                        rr = 0.0;
+                    }
+
+                    if (rr > 1.0)
+                    {
+                        rr = 1.0;
+                    }
+
+                    this.receptionRate = rr;
+                }
             }
 
             if (psu.LeavingSession && !this.LeavingSession)
             {
                 this.LeavingSession = true;
-                this.log.Debug("[" + this + "] leaving session");
+                this.log.Debug(this + ": leaving session");
             }
         }
 
         internal void UpdateWaveStatus(WaveStatusUpdate wsu, DateTime when)
         {
             this.UpdatePacketStatus(wsu, when);
-            long len = this.written.Count;
-            this.written = new BitVector(len, wsu.FileBitVector);
+            this.Session.IntersectOf(wsu.FileBitVector);
+            wsu.FileBitVector = null;
         }
 
         internal async Task Close()
         {
-            this.log.InfoFormat("Closing connection: " + this);
+            this.log.InfoFormat(this + ": Closing connection");
             await this.ServerConnection.Close();
         }
 

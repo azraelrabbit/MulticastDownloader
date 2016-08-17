@@ -15,9 +15,9 @@ namespace MS.MulticastDownloader.Core.Server.IO
     using Common.Logging;
     using Core.Cryptography;
     using Core.IO;
-    using Core.Session;
     using Cryptography;
     using ProtoBuf;
+    using Session;
     using Sockets.Plugin;
     using Sockets.Plugin.Abstractions;
 
@@ -26,7 +26,6 @@ namespace MS.MulticastDownloader.Core.Server.IO
         private ILog log = LogManager.GetLogger<UdpWriter>();
         private IEncoderFactory encoderFactory;
         private IUdpMulticast multicastClient;
-        private ConcurrentBag<IEncoder> encoders = new ConcurrentBag<IEncoder>();
         private bool disposed;
 
         internal UdpWriter(UriParameters parms, IMulticastSettings settings, IMulticastServerSettings serverSettings, IUdpMulticast udpMulticast)
@@ -117,14 +116,8 @@ namespace MS.MulticastDownloader.Core.Server.IO
                     Array.Copy(ms.ToArray(), serialized, serialized.Length);
                     if (this.encoderFactory != null)
                     {
-                        IEncoder encoder;
-                        if (!this.encoders.TryTake(out encoder))
-                        {
-                            encoder = this.encoderFactory.CreateEncoder();
-                        }
-
+                        IEncoder encoder = this.encoderFactory.CreateEncoder();
                         serialized = encoder.Encode(serialized);
-                        this.encoders.Add(encoder);
                     }
 
                     Contract.Assert(serialized.Length <= this.ServerSettings.Mtu);

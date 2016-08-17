@@ -29,15 +29,18 @@ namespace MS.MulticastDownloader.Core.Server
     public class MulticastSession : ServerBase, IEquatable<MulticastSession>, ITransferReporting, ISequenceReporting
     {
         private ILog log = LogManager.GetLogger<MulticastSession>();
-        private BitVector written;
+        private object readerLock = new object();
         private ChunkReader reader;
         private FileSet fileSet;
         private UdpWriter writer;
-        private BoxedLong seqNum;
-        private BoxedLong waveNum;
+        private object seqLock = new object();
+        private long seqNum;
+        private long waveNum = 0;
+        private object updateLock = new object();
+        private long bytesSent = 0;
+        private long waveSize = 0;
         private ThroughputCalculator throughputCalculator = new ThroughputCalculator(Constants.MaxIntervals);
-        private BoxedLong bytesPerSecond;
-        private BoxedLong waveSize;
+        private long bytesPerSecond;
         private bool disposed;
 
         internal MulticastSession(MulticastServer server, string path, int sessionId)
@@ -59,7 +62,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                return this.written;
+                lock (this.readerLock)
+                {
+                    return new BitVector(this.reader.Read.LongCount, this.reader.Read.RawBits);
+                }
             }
         }
 
@@ -117,13 +123,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                ChunkReader reader = this.reader;
-                if (reader != null)
+                lock (this.readerLock)
                 {
-                    return reader.TotalBytes;
+                    return this.reader.TotalBytes;
                 }
-
-                return 0;
             }
         }
 
@@ -137,13 +140,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                ChunkReader reader = this.reader;
-                if (reader != null)
+                lock (this.updateLock)
                 {
-                    return reader.BytesRemaining;
+                    return this.waveSize;
                 }
-
-                return 0;
             }
         }
 
@@ -157,13 +157,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                BoxedLong bps = this.bytesPerSecond;
-                if (bps != null)
+                lock (this.updateLock)
                 {
-                    return bps.Value;
+                    return this.bytesPerSecond;
                 }
-
-                return 0;
             }
         }
 
@@ -177,13 +174,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                BoxedLong seq = this.seqNum;
-                if (seq != null)
+                lock (this.seqLock)
                 {
-                    return seq.Value;
+                    return this.seqNum;
                 }
-
-                return 0;
             }
         }
 
@@ -197,27 +191,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                BoxedLong wave = this.waveNum;
-                if (wave != null)
+                lock (this.seqLock)
                 {
-                    return wave.Value;
+                    return this.waveNum;
                 }
-
-                return 0;
-            }
-        }
-
-        internal long WaveSize
-        {
-            get
-            {
-                BoxedLong wave = this.waveSize;
-                if (wave != null)
-                {
-                    return wave.Value;
-                }
-
-                return 0;
             }
         }
 
@@ -266,16 +243,14 @@ namespace MS.MulticastDownloader.Core.Server
             }
         }
 
-        internal long CountChunks
+        internal long BytesSent
         {
             get
             {
-                if (this.fileSet != null)
+                lock (this.updateLock)
                 {
-                    return this.fileSet.NumSegments;
+                    return this.bytesSent;
                 }
-
-                return 0;
             }
         }
 
@@ -345,54 +320,53 @@ namespace MS.MulticastDownloader.Core.Server
         {
             Contract.Requires(writer != null);
             this.writer = writer;
-            this.log.Debug("Starting session: " + this);
+            this.log.Debug(this + ": Starting session");
             IFolder rootFolder = this.Server.Settings.RootFolder;
             ExistenceCheckResult pathExists = await rootFolder.CheckExistsAsync(this.Path);
             List<string> filePaths = new List<string>();
             if (pathExists == ExistenceCheckResult.FileExists)
             {
-                this.log.Debug(this.Path + " is a file.");
+                this.log.Debug(this + ": " + this.Path + " is a file.");
                 filePaths.Add(this.Path);
             }
             else if (pathExists == ExistenceCheckResult.FolderExists)
             {
-                this.log.Debug(this.Path + " is a folder.");
+                this.log.Debug(this + ": " + this.Path + " is a folder.");
                 rootFolder = await rootFolder.CreateFolderAsync(this.Path, CreationCollisionOption.OpenIfExists);
                 filePaths.AddRange(await rootFolder.GetFilesFromPath(true, (f) => true));
             }
             else
             {
-                this.log.Error(this.Path + " not found.");
+                this.log.Error(this + ": " + this.Path + " not found.");
                 throw new FileNotFoundException();
             }
 
-            this.waveNum = new BoxedLong(1);
             this.fileSet = new FileSet(rootFolder, filePaths);
             await this.fileSet.InitRead(this.writer.BlockSize);
-            this.written = new BitVector(this.fileSet.NumSegments);
-            this.reader = new ChunkReader(this.fileSet.EnumerateChunks(), this.written);
-        }
-
-        internal void CalculatePayload(ICollection<MulticastConnection> connections)
-        {
-            List<BitVector> sessionVectors = new List<BitVector>(connections.Count);
-            foreach (MulticastConnection conn in connections)
-            {
-                sessionVectors.Add(conn.Written);
-            }
-
-            BitVector newWritten = BitVector.IntersectOf(sessionVectors);
-            newWritten.RawBits.CopyTo(this.written.RawBits, 0);
+            this.reader = new ChunkReader(this.fileSet.EnumerateChunks(), new BitVector(this.fileSet.NumSegments));
         }
 
         internal void BeginBurst()
         {
-            this.seqNum = new BoxedLong(0);
-            this.waveSize = new BoxedLong(this.BytesRemaining);
-            this.reader = new ChunkReader(this.fileSet.EnumerateChunks(), this.written);
-            this.log.Debug("Beginning multicast transmit wave " + this.WaveNumber);
-            this.log.Debug("Bytes remaining: " + this.BytesRemaining);
-            this.throughputCalculator.Start(this.BytesRemaining, DateTime.Now);
+            lock (this.seqLock)
+            {
+                this.seqNum = 0;
+                ++this.waveNum;
+            }
+
+            lock (this.updateLock)
+            {
+                this.waveSize = this.reader.BytesRemaining;
+                this.bytesSent = 0;
+                this.throughputCalculator.Start(this.waveSize, DateTime.Now);
+                this.log.Debug(this + ": Beginning multicast transmit wave " + this.waveNum);
+                this.log.Debug(this + ": Bytes remaining: " + this.waveSize);
+            }
+
+            lock (this.readerLock)
+            {
+                this.reader.Reset();
+            }
         }
 
         internal async Task<ICollection<FileSegment>> ReadBurst()
@@ -400,38 +374,37 @@ namespace MS.MulticastDownloader.Core.Server
             return (await this.reader.ReadSegments(this.Server.ServerSettings.MulticastBurstLength)).ToArray();
         }
 
-        internal async Task<long> WriteBurst(ICollection<FileSegment> segments)
+        internal async Task WriteBurst(ICollection<FileSegment> segments)
         {
-            if (this.log.IsTraceEnabled)
-            {
-                foreach (FileSegment seg in segments)
-                {
-                    this.log.TraceFormat("W ID: {0}, len: {1}", seg.SegmentId, seg.Data.Length);
-                }
-            }
-
-            await Task.WhenAll(this.writer.SendMulticast(segments), Task.Delay(this.Server.BurstDelayMs));
-            long seq = this.SequenceNumber + segments.Count;
-            this.seqNum = new BoxedLong(seq);
-            return seq;
+            await Task.WhenAll(
+                this.UpdateTransferStatus(segments),
+                this.writer.SendMulticast(segments),
+                Task.Delay(this.Server.BurstDelayMs));
         }
 
-        internal void UpdateSessionStatus(long seq)
+        internal void BeginIntersectOf()
         {
-            long bytesRemaining = this.BytesRemaining;
-            for (long i = 0; i < seq; ++i)
+            lock (this.readerLock)
             {
-                if (!this.reader.Read[seq])
-                {
-                    bytesRemaining -= this.reader.Chunks[seq].Block.Length;
-                    Contract.Assert(bytesRemaining >= 0);
-                }
+                this.reader.Read.BeginIntersectOf();
             }
+        }
 
-            long average = this.throughputCalculator.UpdateThroughput(bytesRemaining, DateTime.Now);
-            Contract.Assert(average >= 0);
-            this.seqNum = new BoxedLong(seq);
-            this.bytesPerSecond = new BoxedLong(average);
+        internal void IntersectOf(byte[] rawBits)
+        {
+            lock (this.readerLock)
+            {
+                this.reader.Read.IntersectOf(new BitVector(this.reader.Read.LongCount, rawBits));
+            }
+        }
+
+        internal void UpdateSessionStatus()
+        {
+            lock (this.updateLock)
+            {
+                this.bytesPerSecond = this.throughputCalculator.UpdateThroughput(this.waveSize - this.bytesSent, DateTime.Now);
+                Contract.Assert(this.bytesPerSecond >= 0);
+            }
         }
 
         internal async Task Close()
@@ -463,6 +436,30 @@ namespace MS.MulticastDownloader.Core.Server
                     }
                 }
             }
+        }
+
+        private Task UpdateTransferStatus(ICollection<FileSegment> segments)
+        {
+            return Task.Run(() =>
+            {
+                FileSegment last = null;
+                lock (this.updateLock)
+                {
+                    foreach (FileSegment seg in segments)
+                    {
+                        this.bytesSent += seg.Data.Length;
+                        last = seg;
+                    }
+                }
+
+                if (last != null)
+                {
+                    lock (this.seqLock)
+                    {
+                        this.seqNum = last.SegmentId;
+                    }
+                }
+            });
         }
     }
 }

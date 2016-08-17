@@ -107,11 +107,14 @@ namespace MS.MulticastDownloader.Tests.Session
                 bv2[i] = seq2[i];
             }
 
-            BitVector c = BitVector.IntersectOf(new BitVector[] { bv1, bv2 });
-            Assert.Equal(seq1.Length, c.LongCount);
+            BitVector bv3 = new BitVector(seq1.Length);
+            bv3.BeginIntersectOf();
+            bv3.IntersectOf(bv1);
+            bv3.IntersectOf(bv2);
+            Assert.Equal(seq1.Length, bv3.LongCount);
             for (int i = 0; i < seq2.Length; ++i)
             {
-                Assert.Equal(bv1[i] && bv2[i], c[i]);
+                Assert.Equal(bv1[i] && bv2[i], bv3[i]);
             }
         }
     }

@@ -30,6 +30,7 @@ namespace MS.MulticastDownloader.Core.Server
     /// <seealso cref="ServerBase" />
     /// <seealso cref="MulticastConnection" />
     /// <seealso cref="MulticastSession" />
+    /// <seealso cref="ITransferReporting"/>
     /// <seealso cref="IReceptionReporting" />
     public class MulticastServer : ServerBase, ITransferReporting, IReceptionReporting
     {
@@ -38,11 +39,12 @@ namespace MS.MulticastDownloader.Core.Server
         private object sessionLock = new object();
         private List<MulticastConnection> connections = new List<MulticastConnection>();
         private List<MulticastSession> sessions = new List<MulticastSession>();
-        private MulticastSession activeSession;
         private ServerListener listener;
         private IUdpMulticastFactory udpMulticast;
         private HashEncoderFactory encoderFactory;
-        private BoxedDouble receptionRate = new BoxedDouble(1.0);
+        private object updateLock = new object();
+        private double receptionRate = 1.0;
+        private long bytesPerSecond = 0;
         private CancellationToken token = CancellationToken.None;
         private bool disposed;
 
@@ -187,13 +189,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                BoxedDouble receptionRate = this.receptionRate;
-                if (receptionRate != null)
+                lock (this.updateLock)
                 {
-                    return receptionRate.Value;
+                    return this.receptionRate;
                 }
-
-                return 0;
             }
         }
 
@@ -253,21 +252,10 @@ namespace MS.MulticastDownloader.Core.Server
         {
             get
             {
-                MulticastSession session = this.activeSession;
-                if (session != null)
+                lock (this.updateLock)
                 {
-                    return session.BytesPerSecond;
+                    return this.bytesPerSecond;
                 }
-
-                return 0;
-            }
-        }
-
-        internal MulticastSession ActiveSession
-        {
-            get
-            {
-                return this.activeSession;
             }
         }
 
@@ -325,7 +313,7 @@ namespace MS.MulticastDownloader.Core.Server
                             {
                                 Contract.Assert(waveSessions.Count > 0);
                                 await this.TransmitUdp(waveSessions, waveConnections);
-                                await this.WaveStatusUpdate(waveConnections);
+                                await this.WaveStatusUpdate(waveSessions, waveConnections);
                             }
                         }
                     }
@@ -356,7 +344,7 @@ namespace MS.MulticastDownloader.Core.Server
             await this.listener.Close();
             foreach (MulticastConnection mc in this.Connections)
             {
-                this.log.Debug("Closing connection " + mc);
+                this.log.Debug(mc + ": Closing connection");
                 await mc.Close();
             }
         }
@@ -382,7 +370,7 @@ namespace MS.MulticastDownloader.Core.Server
                 }
                 catch (Exception ex)
                 {
-                    this.log.Warn("Client connection failed");
+                    this.log.Warn(mcConn + ": Client connection failed");
                     this.log.Warn(ex.Message);
                     try
                     {
@@ -420,7 +408,7 @@ namespace MS.MulticastDownloader.Core.Server
                     {
                         if (conn.LeavingSession || conn.WhenExpires < now)
                         {
-                            this.log.Debug("Removing connection " + conn);
+                            this.log.Debug(conn + ": Removing connection");
                             toRemove.Add(conn);
                         }
                         else
@@ -460,12 +448,9 @@ namespace MS.MulticastDownloader.Core.Server
                         await ms.Close();
                         ms.Dispose();
                     }
-
-                    ms.CalculatePayload(connections);
                 });
 
                 this.sessions = activeSessions.ToList();
-
                 long waveRemaining = 0;
                 long waveTotal = 0;
                 foreach (MulticastSession session in this.sessions)
@@ -474,7 +459,6 @@ namespace MS.MulticastDownloader.Core.Server
                     waveTotal += session.TotalBytes;
                 }
 
-                this.activeSession = null;
                 this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes remaining: {0}", waveRemaining);
                 this.log.DebugFormat(CultureInfo.InvariantCulture, "Bytes total: {0}", waveTotal);
                 return this.sessions;
@@ -487,48 +471,34 @@ namespace MS.MulticastDownloader.Core.Server
             {
                 foreach (MulticastSession session in sessions)
                 {
-                    Func<long, Task> createBackgroundTask = (l) =>
-                    {
-                        return Task.Run(async () =>
-                        {
-                            sessionCompleteEvent.WaitOne(Constants.PacketUpdateInterval);
-                            await this.AcceptAndJoinClients(false, this.token);
-                            await this.PacketStatusUpdate(connections, false, this.token);
-                            session.UpdateSessionStatus(l);
-                        });
-                    };
-                    Func<Task<ICollection<FileSegment>>> createReadTask = () => session.ReadBurst();
-                    Func<ICollection<FileSegment>, Task<long>> createWriteTask = (fs) => session.WriteBurst(fs);
-
-                    this.activeSession = session;
                     session.BeginBurst();
-                    long seq = 0;
-                    long end = session.Written.RawBits.LongCount();
-                    Task backgroundTask = createBackgroundTask(seq);
-                    Task<ICollection<FileSegment>> readTask = createReadTask();
-                    Task<long> writeTask = Task.FromResult<long>(0);
-                    while (seq < end)
+                    Task statusTask = this.StatusUpdate(connections, sessionCompleteEvent, session);
+                    Task<ICollection<FileSegment>> readTask = session.ReadBurst();
+                    Task writeTask = Task.Run(() => { });
+                    for (; ;)
                     {
-                        Task waited = await Task.WhenAny(backgroundTask, readTask);
-                        if (waited == backgroundTask)
+                        Task waited = await Task.WhenAny(statusTask, readTask);
+                        if (waited == statusTask)
                         {
-                            await backgroundTask;
-                            if (seq < end)
-                            {
-                                backgroundTask = createBackgroundTask(seq);
-                            }
+                            await statusTask;
+                            statusTask = this.StatusUpdate(connections, sessionCompleteEvent, session);
                         }
                         else if (waited == readTask)
                         {
                             ICollection<FileSegment> toWrite = await readTask;
-                            readTask = createReadTask();
-                            seq = await writeTask;
-                            writeTask = createWriteTask(toWrite);
+                            if (toWrite.Count == 0)
+                            {
+                                break;
+                            }
+
+                            readTask = session.ReadBurst();
+                            await writeTask;
+                            writeTask = session.WriteBurst(toWrite);
                         }
                     }
 
                     sessionCompleteEvent.Set();
-                    await Task.WhenAll(backgroundTask, readTask, writeTask);
+                    await Task.WhenAll(statusTask, readTask, writeTask);
                 }
             }
 
@@ -537,7 +507,6 @@ namespace MS.MulticastDownloader.Core.Server
 
         internal async Task PacketStatusUpdate(ICollection<MulticastConnection> connections, bool waveComplete, CancellationToken waveCompleteToken)
         {
-            long bytesLeft = this.activeSession.BytesRemaining;
             await this.RespondToClients<PacketStatusUpdate, PacketStatusUpdateResponse>(connections, (psu, mc) =>
             {
                 mc.UpdatePacketStatus(psu, DateTime.Now);
@@ -550,8 +519,13 @@ namespace MS.MulticastDownloader.Core.Server
             this.UpdateBurstDelay(connections);
         }
 
-        internal async Task WaveStatusUpdate(ICollection<MulticastConnection> connections)
+        internal async Task WaveStatusUpdate(ICollection<MulticastSession> sessions, ICollection<MulticastConnection> connections)
         {
+            foreach (MulticastSession session in sessions)
+            {
+                session.BeginIntersectOf();
+            }
+
             await this.RespondToClients<WaveStatusUpdate, WaveCompleteResponse>(connections, (wsu, mc) =>
             {
                 mc.UpdateWaveStatus(wsu, DateTime.Now);
@@ -567,8 +541,8 @@ namespace MS.MulticastDownloader.Core.Server
             SortedSet<double> receptionRates = new SortedSet<double>();
             foreach (MulticastConnection conn in connections)
             {
-                this.log.Trace(conn + " bps: " + conn.BytesPerSecond + ", rr: " + conn.ReceptionRate);
                 receptionRates.Add(conn.ReceptionRate);
+                this.log.Trace(conn + ": Reception rate: " + conn.ReceptionRate + "  Bytes sent: " + conn.Session.BytesSent);
             }
 
             double receptionRate;
@@ -587,7 +561,11 @@ namespace MS.MulticastDownloader.Core.Server
                     throw new NotImplementedException();
             }
 
-            this.receptionRate = new BoxedDouble(receptionRate);
+            lock (this.updateLock)
+            {
+                this.receptionRate = receptionRate;
+            }
+
             int burstDelay = this.BurstDelayMs;
             if (receptionRate < ServerConstants.IncreaseThreshold || this.BytesPerSecond > this.ServerSettings.MaxBytesPerSecond)
             {
@@ -608,7 +586,7 @@ namespace MS.MulticastDownloader.Core.Server
             }
 
             this.BurstDelayMs = burstDelay;
-            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay + ", conns: " + connections.Count);
+            this.log.Debug("Server reception rate: " + receptionRate + ", burst delay: " + burstDelay + ", conns: " + connections.Count + ", bps: " + this.BytesPerSecond);
         }
 
         internal async Task<MulticastSession> GetSession(string path)
@@ -729,6 +707,18 @@ namespace MS.MulticastDownloader.Core.Server
                     });
                 }
             });
+        }
+
+        private async Task StatusUpdate(ICollection<MulticastConnection> connections, AutoResetEvent sessionCompleteEvent, MulticastSession session)
+        {
+            sessionCompleteEvent.WaitOne(Constants.PacketUpdateInterval);
+            await this.AcceptAndJoinClients(false, this.token);
+            await this.PacketStatusUpdate(connections, false, this.token);
+            session.UpdateSessionStatus();
+            lock (this.updateLock)
+            {
+                this.bytesPerSecond = session.BytesPerSecond;
+            }
         }
     }
 }

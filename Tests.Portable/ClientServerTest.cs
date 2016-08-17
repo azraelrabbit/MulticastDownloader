@@ -51,7 +51,6 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.Null(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.Equal(null, server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -103,7 +102,6 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -154,7 +152,6 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
@@ -203,7 +200,6 @@ namespace MS.MulticastDownloader.Tests
                         Assert.Equal(1, server.Sessions.Count);
                         Assert.NotNull(server.ChallengeKey);
                         Assert.Equal(0, server.BytesPerSecond);
-                        Assert.Equal(szFile, server.BytesRemaining);
                         Assert.NotNull(server.EncoderFactory);
                         Assert.Equal(1, server.ReceptionRate);
                         Assert.Equal(1, client.ReceptionRate);
